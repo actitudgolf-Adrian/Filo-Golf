@@ -4,7 +4,13 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="theme-color" content="#1a1612"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Filo Golf"/>
 <title>Filo Golf</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1612'/><text y='78' x='50' text-anchor='middle' font-size='75' fill='%23C9A84C'>φ</text></svg>"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a1612'/><text y='78' x='50' text-anchor='middle' font-size='75' fill='%23C9A84C'>φ</text></svg>"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -74,8 +80,8 @@ const S={
   lbl:{fontSize:"10px",color:"#8a7a5a",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
   g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"},
   alt:t=>({background:t==="e"?"#3a1010":"#1a2a1a",border:`1px solid ${t==="e"?"#7a2020":"#2a5a2a"}`,borderRadius:"4px",padding:"9px 13px",fontSize:"13px",color:t==="e"?"#e88":"#8e8",marginBottom:"12px"}),
-  hHdr:{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr 40px",gap:"5px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
-  hRow:{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr 40px",gap:"5px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
+  hHdr:{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr 1fr 40px",gap:"5px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
+  hRow:{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr 1fr 40px",gap:"5px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
 };
 function Auth({onLogin}){
   const [mode,setMode]=useState("login");
@@ -155,17 +161,19 @@ function Auth({onLogin}){
 
 function HoleCard({hole,data,onChange,readonly}){
   const [open,setOpen]=useState(false);
-  const d=data||{shots:"",putts:"",zones:{},note:""};
+  const d=data||{shots:"",putts:"",yards:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
   const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note;
   const ii={...S.inp,textAlign:"center",padding:"8px 3px",fontSize:"16px"};
+  const iy={...S.inp,textAlign:"center",padding:"8px 3px",fontSize:"12px"};
   return(
     <div style={{borderBottom:"1px solid #2d2720",paddingBottom:"7px",marginBottom:"7px"}}>
       <div style={S.hRow}>
         <div style={{color:gold,fontWeight:"bold",textAlign:"center",fontSize:"14px"}}>{hole}</div>
         <input style={ii} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
         <input style={ii} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
+        <input style={iy} type="number" min="0" max="999" placeholder="yd" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
         <div style={{textAlign:"center",color:"#8a7a5a",fontSize:"13px"}}>{d.shots&&d.putts?parseInt(d.shots)-parseInt(d.putts):"—"}</div>
         {!readonly
           ?<button style={{...S.btn("g"),padding:"4px 7px",fontSize:"12px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲":"📝"}</button>
@@ -266,7 +274,7 @@ function NewRound({user,onSave,onCancel}){
           </div>
           {err&&<div style={S.alt("e")}>{err}</div>}
           <div style={S.hHdr}>
-            {["HOYO","GOLPES","PUTTS","CHIPS","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+            {["HOYO","GOLPES","PUTTS","YDS","CHIPS","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
           </div>
           {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
             <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false}/>
@@ -300,10 +308,11 @@ function RoundDetail({round,onBack,coachView}){
           <div style={{textAlign:"right"}}>
             <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{round.totalShots}</div>
             <div style={{color:"#8a7a5a",fontSize:"11px"}}>{round.totalPutts} putts · HCP {round.hcp}</div>
+            <div style={{color:"#8a7a5a",fontSize:"11px"}}>Neto: {(round.totalShots||0)-(round.hcp||0)}</div>
           </div>
         </div>
         <div style={S.hHdr}>
-          {["HOYO","GOLPES","PUTTS","CHIPS",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+          {["HOYO","GOLPES","PUTTS","YDS","CHIPS",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
         </div>
         {Array.from({length:count},(_,i)=>i+1).map(h=>(
           <HoleCard key={h} hole={h} data={round.holes?.[h]||{}} onChange={()=>{}} readonly/>
@@ -365,6 +374,7 @@ function MyRounds({user}){
             <div style={{textAlign:"right"}}>
               <div style={{color:gold,fontSize:"22px",fontWeight:"bold"}}>{r.totalShots}</div>
               <div style={{color:"#8a7a5a",fontSize:"11px"}}>{r.totalPutts} putts</div>
+              <div style={{color:"#8a7a5a",fontSize:"11px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
             </div>
           </div>
         </div>
@@ -379,15 +389,26 @@ function Stats({user}){
     const idx=lsGet("rounds:"+user.username)||[];
     setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
   },[]);
-  const avg=rounds.length?(rounds.reduce((s,r)=>s+(r.totalShots||0),0)/rounds.length).toFixed(1):"—";
+  const avgGross=rounds.length?(rounds.reduce((s,r)=>s+(r.totalShots||0),0)/rounds.length).toFixed(1):"—";
+  const avgNeto=rounds.length?(rounds.reduce((s,r)=>s+((r.totalShots||0)-(r.hcp||0)),0)/rounds.length).toFixed(1):"—";
   const best=rounds.length?Math.min(...rounds.map(r=>r.totalShots||999)):"—";
+  const bestNeto=rounds.length?Math.min(...rounds.map(r=>(r.totalShots||0)-(r.hcp||0))):"—";
   return(
     <div style={S.page}>
       <div style={S.h2}>Mis Estadísticas</div>
-      <div style={{...S.card,textAlign:"center",padding:"24px"}}>
-        <div style={{color:"#8a7a5a",fontSize:"10px",letterSpacing:"2px",marginBottom:"4px"}}>PROMEDIO</div>
-        <div style={{color:gold,fontSize:"40px",fontWeight:"bold"}}>{avg}</div>
-        <div style={{color:"#8a7a5a",fontSize:"12px",marginTop:"4px"}}>mejor vuelta: {best===999?"—":best}</div>
+      <div style={{...S.g2,marginBottom:"12px"}}>
+        <div style={{...S.card,textAlign:"center",padding:"18px"}}>
+          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. GROSS</div>
+          <div style={{color:gold,fontSize:"34px",fontWeight:"bold"}}>{avgGross}</div>
+          <div style={{color:"#8a7a5a",fontSize:"11px",marginTop:"4px"}}>mejor: {best===999?"—":best}</div>
+        </div>
+        <div style={{...S.card,textAlign:"center",padding:"18px"}}>
+          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. NETO</div>
+          <div style={{color:gold,fontSize:"34px",fontWeight:"bold"}}>{avgNeto}</div>
+          <div style={{color:"#8a7a5a",fontSize:"11px",marginTop:"4px"}}>mejor: {bestNeto}</div>
+        </div>
+      </div>
+      <div style={{...S.card,textAlign:"center",padding:"14px"}}>
         <div style={{color:"#8a7a5a",fontSize:"12px"}}>{rounds.length} vuelta{rounds.length!==1?"s":""} registradas</div>
         <div style={{color:"#8a7a5a",fontSize:"12px",marginTop:"4px"}}>{getCat(user.hcp)} · HCP {user.hcp}</div>
       </div>
@@ -395,7 +416,6 @@ function Stats({user}){
     </div>
   );
 }
-
 function CoachPanel(){
   const [tab,setTab]=useState("import");
   const [players,setPlayers]=useState(()=>lsGet("coach:players")||[]);
@@ -449,7 +469,9 @@ function CoachPanel(){
         rank.length===0
           ?<div style={{...S.card,color:"#8a7a5a",textAlign:"center",padding:"36px"}}>Importá datos de alumnos para ver el ranking.</div>
           :rank.map((p,i)=>{
-            const avg=(p.shots/p.rounds.length).toFixed(1);
+            const avgGross=(p.shots/p.rounds.length).toFixed(1);
+            const netoShots=p.rounds.reduce((s,r)=>s+((r.totalShots||0)-(r.hcp||0)),0);
+            const avgNeto=(netoShots/p.rounds.length).toFixed(1);
             const best=Math.min(...p.rounds.map(r=>r.totalShots||999));
             const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
             return(
@@ -457,10 +479,11 @@ function CoachPanel(){
                 <div style={{fontSize:"18px",minWidth:"26px",textAlign:"center"}}>{medal||<span style={{color:"#8a7a5a",fontSize:"12px",fontWeight:"bold"}}>#{i+1}</span>}</div>
                 <div style={{flex:1}}>
                   <div style={{color:"#e8dcc8",fontWeight:"bold",fontSize:"13px"}}>{p.name}</div>
-                  <div style={{color:"#8a7a5a",fontSize:"10px"}}>{getCat(p.hcp)} · {p.rounds.length} vuelta{p.rounds.length!==1?"s":""}</div>
+                  <div style={{color:"#8a7a5a",fontSize:"10px"}}>{getCat(p.hcp)} · HCP {p.hcp} · {p.rounds.length} vuelta{p.rounds.length!==1?"s":""}</div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{color:gold,fontSize:"19px",fontWeight:"bold"}}>{avg}</div>
+                  <div style={{color:gold,fontSize:"17px",fontWeight:"bold"}}>{avgGross} <span style={{fontSize:"11px",color:"#8a7a5a"}}>gross</span></div>
+                  <div style={{color:"#8a7a5a",fontSize:"13px",fontWeight:"bold"}}>{avgNeto} <span style={{fontSize:"10px"}}>neto</span></div>
                   <div style={{color:"#8a7a5a",fontSize:"10px"}}>mejor: {best===999?"—":best}</div>
                 </div>
               </div>
@@ -498,7 +521,10 @@ function CoachPanel(){
                   <div style={{color:"#e8dcc8",fontSize:"13px"}}>{r.courseName}</div>
                   <div style={{color:"#8a7a5a",fontSize:"10px"}}>{r.date} · {r.format}</div>
                 </div>
-                <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.totalShots}</div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.totalShots}</div>
+                  <div style={{color:"#8a7a5a",fontSize:"10px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -514,7 +540,10 @@ function CoachPanel(){
                   <div style={{color:"#e8dcc8",fontWeight:"bold"}}>{r.playerName}</div>
                   <div style={{color:"#8a7a5a",fontSize:"11px"}}>{r.courseName} · {r.date} · {r.format}</div>
                 </div>
-                <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{r.totalShots}</div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{r.totalShots}</div>
+                  <div style={{color:"#8a7a5a",fontSize:"10px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
+                </div>
               </div>
             </div>
           ))
@@ -522,6 +551,7 @@ function CoachPanel(){
     </div>
   );
 }
+
 function Profile({user,onUpdate}){
   const [f,setF]=useState({hcp:user.hcp||18,hcpT:user.hcpT||"libre"});
   const [msg,setMsg]=useState("");
