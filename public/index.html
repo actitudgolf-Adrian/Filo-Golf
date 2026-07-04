@@ -80,8 +80,8 @@ const S={
   lbl:{fontSize:"10px",color:"#8a7a5a",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
   g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"},
   alt:t=>({background:t==="e"?"#3a1010":"#1a2a1a",border:`1px solid ${t==="e"?"#7a2020":"#2a5a2a"}`,borderRadius:"4px",padding:"9px 13px",fontSize:"13px",color:t==="e"?"#e88":"#8e8",marginBottom:"12px"}),
-  hHdr:{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr 1fr 40px",gap:"5px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
-  hRow:{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr 1fr 40px",gap:"5px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
+  hHdr:{display:"grid",gridTemplateColumns:"28px 40px 1fr 1fr 1fr 1fr 40px",gap:"4px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
+  hRow:{display:"grid",gridTemplateColumns:"28px 40px 1fr 1fr 1fr 1fr 40px",gap:"4px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
 };
 function Auth({onLogin}){
   const [mode,setMode]=useState("login");
@@ -161,20 +161,28 @@ function Auth({onLogin}){
 
 function HoleCard({hole,data,onChange,readonly}){
   const [open,setOpen]=useState(false);
-  const d=data||{shots:"",putts:"",yards:"",zones:{},note:""};
+  const d=data||{shots:"",putts:"",chips:0,yards:"",par:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
   const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note;
-  const ii={...S.inp,textAlign:"center",padding:"8px 3px",fontSize:"16px"};
-  const iy={...S.inp,textAlign:"center",padding:"8px 3px",fontSize:"12px"};
+  const ii={...S.inp,textAlign:"center",padding:"8px 2px",fontSize:"15px"};
+  const is={...S.inp,textAlign:"center",padding:"8px 2px",fontSize:"12px"};
   return(
     <div style={{borderBottom:"1px solid #2d2720",paddingBottom:"7px",marginBottom:"7px"}}>
       <div style={S.hRow}>
-        <div style={{color:gold,fontWeight:"bold",textAlign:"center",fontSize:"14px"}}>{hole}</div>
+        <div style={{color:gold,fontWeight:"bold",textAlign:"center",fontSize:"13px"}}>{hole}</div>
+        <input style={is} type="number" min="3" max="6" placeholder="par" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/>
         <input style={ii} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
         <input style={ii} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
-        <input style={iy} type="number" min="0" max="999" placeholder="yd" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
-        <div style={{textAlign:"center",color:"#8a7a5a",fontSize:"13px"}}>{d.shots&&d.putts?parseInt(d.shots)-parseInt(d.putts):"—"}</div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"3px"}}>
+          {!readonly
+            ?<><button style={{...S.btn("g"),padding:"2px 6px",fontSize:"14px",lineHeight:1}} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
+              <span style={{color:"#e8dcc8",fontSize:"13px",minWidth:"16px",textAlign:"center"}}>{d.chips||0}</span>
+              <button style={{...S.btn("g"),padding:"2px 6px",fontSize:"14px",lineHeight:1}} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
+            :<span style={{color:"#e8dcc8",fontSize:"13px",textAlign:"center"}}>{d.chips||0}</span>
+          }
+        </div>
+        <input style={is} type="number" min="0" max="999" placeholder="yds" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
         {!readonly
           ?<button style={{...S.btn("g"),padding:"4px 7px",fontSize:"12px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲":"📝"}</button>
           :<div style={{textAlign:"center"}}>{hasNotes&&<span style={{fontSize:"12px"}}>📝</span>}</div>
@@ -217,11 +225,12 @@ function NewRound({user,onSave,onCancel}){
   const holeCount=course?.holes||18;
   const totalShots=Object.values(holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0);
   const totalPutts=Object.values(holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0);
+  const totalChips=Object.values(holes).reduce((s,h)=>s+(parseInt(h.chips)||0),0);
 
   function save(){
     if(!meta.courseId){setErr("Seleccioná una cancha.");return}
     const id=Date.now().toString();
-    const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,holes,totalShots,totalPutts,createdAt:Date.now()};
+    const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,holes,totalShots,totalPutts,totalChips,createdAt:Date.now()};
     lsSet("round:"+id,round);
     const idx=lsGet("rounds:"+user.username)||[];
     idx.push(id);lsSet("rounds:"+user.username,idx);
@@ -269,18 +278,18 @@ function NewRound({user,onSave,onCancel}){
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{totalShots||"—"}</div>
-              <div style={{color:"#8a7a5a",fontSize:"10px"}}>{totalPutts} putts</div>
+              <div style={{color:"#8a7a5a",fontSize:"10px"}}>{totalPutts} putts · {totalChips} chips</div>
             </div>
           </div>
           {err&&<div style={S.alt("e")}>{err}</div>}
           <div style={S.hHdr}>
-            {["HOYO","GOLPES","PUTTS","YDS","CHIPS","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+            {["H","PAR","GOLPES","PUTTS","CHIPS","AL GREEN","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
           </div>
           {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
             <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false}/>
           ))}
           <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderTop:"1px solid #4a3f28",marginTop:"6px"}}>
-            <div style={{color:"#8a7a5a",fontSize:"12px"}}>Putts: <span style={{color:"#e8dcc8"}}>{totalPutts||"—"}</span></div>
+            <div style={{color:"#8a7a5a",fontSize:"12px"}}>Putts: <span style={{color:"#e8dcc8"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:"#e8dcc8"}}>{totalChips}</span></div>
             <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>Total: {totalShots||"—"}</div>
           </div>
           <div style={{display:"flex",gap:"8px",marginTop:"12px"}}>
@@ -307,12 +316,12 @@ function RoundDetail({round,onBack,coachView}){
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{round.totalShots}</div>
-            <div style={{color:"#8a7a5a",fontSize:"11px"}}>{round.totalPutts} putts · HCP {round.hcp}</div>
+            <div style={{color:"#8a7a5a",fontSize:"11px"}}>{round.totalPutts} putts · {round.totalChips||0} chips</div>
             <div style={{color:"#8a7a5a",fontSize:"11px"}}>Neto: {(round.totalShots||0)-(round.hcp||0)}</div>
           </div>
         </div>
         <div style={S.hHdr}>
-          {["HOYO","GOLPES","PUTTS","YDS","CHIPS",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+          {["H","PAR","GOLPES","PUTTS","CHIPS","AL GREEN",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
         </div>
         {Array.from({length:count},(_,i)=>i+1).map(h=>(
           <HoleCard key={h} hole={h} data={round.holes?.[h]||{}} onChange={()=>{}} readonly/>
@@ -373,7 +382,7 @@ function MyRounds({user}){
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{color:gold,fontSize:"22px",fontWeight:"bold"}}>{r.totalShots}</div>
-              <div style={{color:"#8a7a5a",fontSize:"11px"}}>{r.totalPutts} putts</div>
+              <div style={{color:"#8a7a5a",fontSize:"11px"}}>{r.totalPutts} putts · {r.totalChips||0} chips</div>
               <div style={{color:"#8a7a5a",fontSize:"11px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
             </div>
           </div>
@@ -393,6 +402,8 @@ function Stats({user}){
   const avgNeto=rounds.length?(rounds.reduce((s,r)=>s+((r.totalShots||0)-(r.hcp||0)),0)/rounds.length).toFixed(1):"—";
   const best=rounds.length?Math.min(...rounds.map(r=>r.totalShots||999)):"—";
   const bestNeto=rounds.length?Math.min(...rounds.map(r=>(r.totalShots||0)-(r.hcp||0))):"—";
+  const avgPutts=rounds.length?(rounds.reduce((s,r)=>s+(r.totalPutts||0),0)/rounds.length).toFixed(1):"—";
+  const avgChips=rounds.length?(rounds.reduce((s,r)=>s+(r.totalChips||0),0)/rounds.length).toFixed(1):"—";
   return(
     <div style={S.page}>
       <div style={S.h2}>Mis Estadísticas</div>
@@ -408,9 +419,18 @@ function Stats({user}){
           <div style={{color:"#8a7a5a",fontSize:"11px",marginTop:"4px"}}>mejor: {bestNeto}</div>
         </div>
       </div>
+      <div style={{...S.g2,marginBottom:"12px"}}>
+        <div style={{...S.card,textAlign:"center",padding:"14px"}}>
+          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. PUTTS</div>
+          <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{avgPutts}</div>
+        </div>
+        <div style={{...S.card,textAlign:"center",padding:"14px"}}>
+          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. CHIPS</div>
+          <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{avgChips}</div>
+        </div>
+      </div>
       <div style={{...S.card,textAlign:"center",padding:"14px"}}>
-        <div style={{color:"#8a7a5a",fontSize:"12px"}}>{rounds.length} vuelta{rounds.length!==1?"s":""} registradas</div>
-        <div style={{color:"#8a7a5a",fontSize:"12px",marginTop:"4px"}}>{getCat(user.hcp)} · HCP {user.hcp}</div>
+        <div style={{color:"#8a7a5a",fontSize:"12px"}}>{rounds.length} vuelta{rounds.length!==1?"s":""} registradas · {getCat(user.hcp)} · HCP {user.hcp}</div>
       </div>
       <div style={{fontSize:"11px",color:"#8a7a5a",textAlign:"center",padding:"10px",background:"#231f18",borderRadius:"4px"}}>El ranking general lo ve tu coach Adrián.</div>
     </div>
