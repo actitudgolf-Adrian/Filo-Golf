@@ -80,8 +80,8 @@ const S={
   lbl:{fontSize:"10px",color:"#8a7a5a",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
   g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"},
   alt:t=>({background:t==="e"?"#3a1010":"#1a2a1a",border:`1px solid ${t==="e"?"#7a2020":"#2a5a2a"}`,borderRadius:"4px",padding:"9px 13px",fontSize:"13px",color:t==="e"?"#e88":"#8e8",marginBottom:"12px"}),
-  hHdr:{display:"grid",gridTemplateColumns:"28px 40px 1fr 1fr 1fr 1fr 40px",gap:"4px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
-  hRow:{display:"grid",gridTemplateColumns:"28px 40px 1fr 1fr 1fr 1fr 40px",gap:"4px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
+  hHdr:{display:"grid",gridTemplateColumns:"24px 36px 36px 1fr 1fr 1fr 1fr 38px",gap:"3px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
+  hRow:{display:"grid",gridTemplateColumns:"24px 36px 36px 1fr 1fr 1fr 1fr 38px",gap:"3px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
 };
 function Auth({onLogin}){
   const [mode,setMode]=useState("login");
@@ -161,17 +161,18 @@ function Auth({onLogin}){
 
 function HoleCard({hole,data,onChange,readonly}){
   const [open,setOpen]=useState(false);
-  const d=data||{shots:"",putts:"",chips:0,yards:"",par:"",zones:{},note:""};
+  const d=data||{shots:"",putts:"",chips:0,yards:"",par:"",dist:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
   const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note;
-  const ii={...S.inp,textAlign:"center",padding:"8px 2px",fontSize:"15px"};
-  const is={...S.inp,textAlign:"center",padding:"8px 2px",fontSize:"12px"};
+  const ii={...S.inp,textAlign:"center",padding:"7px 2px",fontSize:"14px"};
+  const is={...S.inp,textAlign:"center",padding:"7px 2px",fontSize:"11px"};
   return(
     <div style={{borderBottom:"1px solid #2d2720",paddingBottom:"7px",marginBottom:"7px"}}>
       <div style={S.hRow}>
         <div style={{color:gold,fontWeight:"bold",textAlign:"center",fontSize:"13px"}}>{hole}</div>
         <input style={is} type="number" min="3" max="6" placeholder="par" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/>
+        <input style={is} type="number" min="0" max="999" placeholder="mts" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/>
         <input style={ii} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
         <input style={ii} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
         <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"3px"}}>
@@ -283,7 +284,7 @@ function NewRound({user,onSave,onCancel}){
           </div>
           {err&&<div style={S.alt("e")}>{err}</div>}
           <div style={S.hHdr}>
-            {["H","PAR","GOLPES","PUTTS","CHIPS","AL GREEN","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+            {["H","PAR","MTS","GOLPES","PUTTS","CHIPS","AL GREEN","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
           </div>
           {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
             <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false}/>
@@ -321,7 +322,7 @@ function RoundDetail({round,onBack,coachView}){
           </div>
         </div>
         <div style={S.hHdr}>
-          {["H","PAR","GOLPES","PUTTS","CHIPS","AL GREEN",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+          {["H","PAR","MTS","GOLPES","PUTTS","CHIPS","AL GREEN",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
         </div>
         {Array.from({length:count},(_,i)=>i+1).map(h=>(
           <HoleCard key={h} hole={h} data={round.holes?.[h]||{}} onChange={()=>{}} readonly/>
@@ -334,7 +335,6 @@ function RoundDetail({round,onBack,coachView}){
 function MyRounds({user}){
   const [rounds,setRounds]=useState([]);
   const [selected,setSelected]=useState(null);
-  const [showExport,setShowExport]=useState(false);
 
   useEffect(()=>{
     const idx=lsGet("rounds:"+user.username)||[];
@@ -349,24 +349,21 @@ function MyRounds({user}){
     return btoa(unescape(encodeURIComponent(JSON.stringify({user:ud,rounds:rs,exportedAt:Date.now()}))));
   }
 
+  function sendWhatsApp(){
+    const code=exportData();
+    const msg=encodeURIComponent("FiloGolf-datos:\n"+code);
+    window.open("https://wa.me/5491140462719?text="+msg,"_blank");
+  }
+
   if(selected)return <RoundDetail round={selected} onBack={()=>setSelected(null)}/>;
-  const code=showExport?exportData():"";
 
   return(
     <div style={S.page}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
         <div style={S.h2}>Mis Vueltas</div>
-        <button style={{...S.btn("g"),fontSize:"11px"}} onClick={()=>setShowExport(s=>!s)}>{showExport?"Cerrar":"📤 Enviar al coach"}</button>
+        <button style={{...S.btn("p"),fontSize:"11px",padding:"7px 12px"}} onClick={sendWhatsApp}>📲 Enviar al coach</button>
       </div>
-      {showExport&&(
-        <div style={S.card}>
-          <div style={{fontSize:"11px",color:gold,letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Código para tu coach</div>
-          <div style={{fontSize:"10px",color:"#8a7a5a",marginBottom:"10px"}}>Copiá este código y enviáselo a Adrián por WhatsApp.</div>
-          <textarea readOnly style={{...S.inp,fontSize:"10px",minHeight:"80px",resize:"none",wordBreak:"break-all"}} value={code}/>
-          <button style={{...S.btn("p"),marginTop:"8px",width:"100%"}} onClick={()=>{try{navigator.clipboard.writeText(code);alert("¡Copiado! Enviáselo a Adrián.")}catch{alert("Seleccioná el texto y copialo manualmente.")}}}>Copiar código</button>
-        </div>
-      )}
-      {rounds.length===0&&!showExport&&(
+      {rounds.length===0&&(
         <div style={{...S.card,textAlign:"center",color:"#8a7a5a",padding:"40px 20px"}}>
           <div style={{fontSize:"32px",marginBottom:"10px"}}>⛳</div>
           <div>Todavía no registraste ninguna vuelta.</div>
@@ -478,7 +475,7 @@ function CoachPanel(){
       {tab==="import"&&(
         <div style={S.card}>
           <div style={S.h2}>Importar datos de alumno</div>
-          <div style={{fontSize:"12px",color:"#8a7a5a",marginBottom:"12px"}}>Pedile al alumno que vaya a "Mis Vueltas" → "Enviar al coach", que copie el código y te lo mande por WhatsApp.</div>
+          <div style={{fontSize:"12px",color:"#8a7a5a",marginBottom:"12px"}}>Pegá acá el código que te mandó el alumno por WhatsApp.</div>
           {msg&&<div style={S.alt(msg.includes("✓")?"s":"e")}>{msg}</div>}
           <label style={S.lbl}>Código del alumno</label>
           <textarea style={{...S.inp,minHeight:"80px",resize:"vertical",fontSize:"11px",wordBreak:"break-all",marginBottom:"10px"}} placeholder="Pegá el código acá..." value={code} onChange={e=>setCode(e.target.value)}/>
