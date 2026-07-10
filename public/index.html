@@ -80,9 +80,71 @@ const S={
   lbl:{fontSize:"10px",color:"#8a7a5a",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
   g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"},
   alt:t=>({background:t==="e"?"#3a1010":"#1a2a1a",border:`1px solid ${t==="e"?"#7a2020":"#2a5a2a"}`,borderRadius:"4px",padding:"9px 13px",fontSize:"13px",color:t==="e"?"#e88":"#8e8",marginBottom:"12px"}),
-  hHdr:{display:"grid",gridTemplateColumns:"24px 36px 36px 1fr 1fr 1fr 1fr 38px",gap:"3px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
-  hRow:{display:"grid",gridTemplateColumns:"24px 36px 36px 1fr 1fr 1fr 1fr 38px",gap:"3px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
+  hHdr:{display:"grid",gridTemplateColumns:"22px 32px 32px 1fr 1fr 1fr 1fr 1fr 36px",gap:"3px",padding:"4px 0 8px",borderBottom:"1px solid #4a3f28"},
+  hRow:{display:"grid",gridTemplateColumns:"22px 32px 32px 1fr 1fr 1fr 1fr 1fr 36px",gap:"3px",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #2d2720"},
 };
+
+function StatCard({label,value,sub}){
+  return(
+    <div style={{...S.card,textAlign:"center",padding:"14px"}}>
+      <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>{label}</div>
+      <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{value}</div>
+      {sub&&<div style={{color:"#8a7a5a",fontSize:"10px",marginTop:"3px"}}>{sub}</div>}
+    </div>
+  );
+}
+
+function calcStats(rounds){
+  if(!rounds.length) return null;
+  const n=rounds.length;
+  const totalHoles=rounds.reduce((s,r)=>s+Object.keys(r.holes||{}).length,0);
+  const avgGross=(rounds.reduce((s,r)=>s+(r.totalShots||0),0)/n).toFixed(1);
+  const avgNeto=(rounds.reduce((s,r)=>s+((r.totalShots||0)-(r.hcp||0)),0)/n).toFixed(1);
+  const best=Math.min(...rounds.map(r=>r.totalShots||999));
+  const bestNeto=Math.min(...rounds.map(r=>(r.totalShots||0)-(r.hcp||0)));
+  const totalPutts=rounds.reduce((s,r)=>s+(r.totalPutts||0),0);
+  const totalChips=rounds.reduce((s,r)=>s+(r.totalChips||0),0);
+  const totalBunker=rounds.reduce((s,r)=>s+(r.totalBunker||0),0);
+  const avgPutts=(totalPutts/n).toFixed(1);
+  const avgPuttsHoyo=totalHoles?(totalPutts/totalHoles).toFixed(2):"—";
+  const avgChips=(totalChips/n).toFixed(1);
+  const avgChipsHoyo=totalHoles?(totalChips/totalHoles).toFixed(2):"—";
+  const avgBunker=(totalBunker/n).toFixed(1);
+  const avgBunkerHoyo=totalHoles?(totalBunker/totalHoles).toFixed(2):"—";
+  return{n,avgGross,avgNeto,best,bestNeto,avgPutts,avgPuttsHoyo,avgChips,avgChipsHoyo,avgBunker,avgBunkerHoyo};
+}
+
+function StatsView({rounds,hcp,isCoach}){
+  const st=calcStats(rounds);
+  if(!st) return <div style={{...S.card,color:"#8a7a5a",textAlign:"center",padding:"36px"}}>Sin vueltas registradas aún.</div>;
+  return(
+    <div>
+      <div style={{color:"#8a7a5a",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Score</div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. GROSS" value={st.avgGross} sub={"mejor: "+(st.best===999?"—":st.best)}/>
+        <StatCard label="PROM. NETO" value={st.avgNeto} sub={"mejor: "+st.bestNeto}/>
+      </div>
+      <div style={{color:"#8a7a5a",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Putting</div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. PUTTS/RONDA" value={st.avgPutts}/>
+        <StatCard label="PROM. PUTTS/HOYO" value={st.avgPuttsHoyo}/>
+      </div>
+      <div style={{color:"#8a7a5a",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Juego corto</div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. CHIPS/RONDA" value={st.avgChips}/>
+        <StatCard label="PROM. CHIPS/HOYO" value={st.avgChipsHoyo}/>
+      </div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. BÚNKER/RONDA" value={st.avgBunker}/>
+        <StatCard label="PROM. BÚNKER/HOYO" value={st.avgBunkerHoyo}/>
+      </div>
+      <div style={{...S.card,textAlign:"center",padding:"12px"}}>
+        <div style={{color:"#8a7a5a",fontSize:"11px"}}>{st.n} vuelta{st.n!==1?"s":""} · {getCat(hcp)} · HCP {hcp}</div>
+      </div>
+      {!isCoach&&<div style={{fontSize:"11px",color:"#8a7a5a",textAlign:"center",padding:"10px",background:"#231f18",borderRadius:"4px"}}>El ranking general lo ve tu coach Adrián.</div>}
+    </div>
+  );
+}
 function Auth({onLogin}){
   const [mode,setMode]=useState("login");
   const [f,setF]=useState({user:"",pass:"",code:"",name:"",hcp:"18",hcpT:"libre"});
@@ -161,10 +223,10 @@ function Auth({onLogin}){
 
 function HoleCard({hole,data,onChange,readonly}){
   const [open,setOpen]=useState(false);
-  const d=data||{shots:"",putts:"",chips:0,yards:"",par:"",dist:"",zones:{},note:""};
+  const d=data||{shots:"",putts:"",chips:0,bunker:0,yards:"",par:"",dist:"",salida:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
-  const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note;
+  const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note||d.salida;
   const ii={...S.inp,textAlign:"center",padding:"7px 2px",fontSize:"14px"};
   const is={...S.inp,textAlign:"center",padding:"7px 2px",fontSize:"11px"};
   return(
@@ -175,12 +237,20 @@ function HoleCard({hole,data,onChange,readonly}){
         <input style={is} type="number" min="0" max="999" placeholder="mts" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/>
         <input style={ii} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
         <input style={ii} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"3px"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"2px"}}>
           {!readonly
-            ?<><button style={{...S.btn("g"),padding:"2px 6px",fontSize:"14px",lineHeight:1}} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
-              <span style={{color:"#e8dcc8",fontSize:"13px",minWidth:"16px",textAlign:"center"}}>{d.chips||0}</span>
-              <button style={{...S.btn("g"),padding:"2px 6px",fontSize:"14px",lineHeight:1}} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
-            :<span style={{color:"#e8dcc8",fontSize:"13px",textAlign:"center"}}>{d.chips||0}</span>
+            ?<><button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
+              <span style={{color:"#e8dcc8",fontSize:"12px",minWidth:"14px",textAlign:"center"}}>{d.chips||0}</span>
+              <button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
+            :<span style={{color:"#e8dcc8",fontSize:"12px",textAlign:"center"}}>{d.chips||0}</span>
+          }
+        </div>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"2px"}}>
+          {!readonly
+            ?<><button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("bunker",Math.max(0,(parseInt(d.bunker)||0)-1))}>−</button>
+              <span style={{color:"#e8dcc8",fontSize:"12px",minWidth:"14px",textAlign:"center"}}>{d.bunker||0}</span>
+              <button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("bunker",(parseInt(d.bunker)||0)+1)}>+</button></>
+            :<span style={{color:"#e8dcc8",fontSize:"12px",textAlign:"center"}}>{d.bunker||0}</span>
           }
         </div>
         <input style={is} type="number" min="0" max="999" placeholder="yds" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
@@ -192,6 +262,12 @@ function HoleCard({hole,data,onChange,readonly}){
       {open&&!readonly&&(
         <div style={{background:"#1e1a14",border:"1px solid #3a3020",borderRadius:"4px",padding:"12px",marginTop:"6px"}}>
           <div style={{fontSize:"9px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Anotaciones — Hoyo {hole}</div>
+          <label style={S.lbl}>Tiro de salida (opcional)</label>
+          <div style={{display:"flex",gap:"6px",marginBottom:"10px"}}>
+            {["Fairway","Rough","Penalidad"].map(op=>(
+              <button key={op} style={{...S.btn(d.salida===op?"p":"g"),flex:1,padding:"6px 4px",fontSize:"11px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
+            ))}
+          </div>
           {ZONES.map(z=>(
             <div key={z} style={{marginBottom:"7px"}}>
               <label style={S.lbl}>{z}</label>
@@ -204,6 +280,7 @@ function HoleCard({hole,data,onChange,readonly}){
       )}
       {readonly&&hasNotes&&(
         <div style={{background:"#1e1a14",border:"1px solid #3a3020",borderRadius:"4px",padding:"10px",marginTop:"5px"}}>
+          {d.salida&&<div style={{marginBottom:"5px"}}><span style={{color:"#8a7a5a",fontSize:"10px"}}>Salida: </span><span style={{color:"#e8dcc8",fontSize:"12px"}}>{d.salida}</span></div>}
           {ZONES.map(z=>d.zones?.[z]&&(
             <div key={z} style={{marginBottom:"5px"}}>
               <span style={{color:"#8a7a5a",fontSize:"10px"}}>{z}: </span>
@@ -227,11 +304,12 @@ function NewRound({user,onSave,onCancel}){
   const totalShots=Object.values(holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0);
   const totalPutts=Object.values(holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0);
   const totalChips=Object.values(holes).reduce((s,h)=>s+(parseInt(h.chips)||0),0);
+  const totalBunker=Object.values(holes).reduce((s,h)=>s+(parseInt(h.bunker)||0),0);
 
   function save(){
     if(!meta.courseId){setErr("Seleccioná una cancha.");return}
     const id=Date.now().toString();
-    const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,holes,totalShots,totalPutts,totalChips,createdAt:Date.now()};
+    const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,holes,totalShots,totalPutts,totalChips,totalBunker,createdAt:Date.now()};
     lsSet("round:"+id,round);
     const idx=lsGet("rounds:"+user.username)||[];
     idx.push(id);lsSet("rounds:"+user.username,idx);
@@ -279,18 +357,18 @@ function NewRound({user,onSave,onCancel}){
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{totalShots||"—"}</div>
-              <div style={{color:"#8a7a5a",fontSize:"10px"}}>{totalPutts} putts · {totalChips} chips</div>
+              <div style={{color:"#8a7a5a",fontSize:"10px"}}>{totalPutts} putts · {totalChips} chips · {totalBunker} búnker</div>
             </div>
           </div>
           {err&&<div style={S.alt("e")}>{err}</div>}
           <div style={S.hHdr}>
-            {["H","PAR","MTS","GOLPES","PUTTS","CHIPS","AL GREEN","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+            {["H","PAR","MTS","GOLPES","PUTTS","CHIP","BÚNKER","AL GREEN","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
           </div>
           {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
             <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false}/>
           ))}
           <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderTop:"1px solid #4a3f28",marginTop:"6px"}}>
-            <div style={{color:"#8a7a5a",fontSize:"12px"}}>Putts: <span style={{color:"#e8dcc8"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:"#e8dcc8"}}>{totalChips}</span></div>
+            <div style={{color:"#8a7a5a",fontSize:"12px"}}>Putts: <span style={{color:"#e8dcc8"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:"#e8dcc8"}}>{totalChips}</span> · Búnker: <span style={{color:"#e8dcc8"}}>{totalBunker}</span></div>
             <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>Total: {totalShots||"—"}</div>
           </div>
           <div style={{display:"flex",gap:"8px",marginTop:"12px"}}>
@@ -317,12 +395,12 @@ function RoundDetail({round,onBack,coachView}){
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{round.totalShots}</div>
-            <div style={{color:"#8a7a5a",fontSize:"11px"}}>{round.totalPutts} putts · {round.totalChips||0} chips</div>
+            <div style={{color:"#8a7a5a",fontSize:"11px"}}>{round.totalPutts} putts · {round.totalChips||0} chips · {round.totalBunker||0} búnker</div>
             <div style={{color:"#8a7a5a",fontSize:"11px"}}>Neto: {(round.totalShots||0)-(round.hcp||0)}</div>
           </div>
         </div>
         <div style={S.hHdr}>
-          {["H","PAR","MTS","GOLPES","PUTTS","CHIPS","AL GREEN",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
+          {["H","PAR","MTS","GOLPES","PUTTS","CHIP","BÚNKER","AL GREEN",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#8a7a5a",textAlign:"center"}}>{h}</div>)}
         </div>
         {Array.from({length:count},(_,i)=>i+1).map(h=>(
           <HoleCard key={h} hole={h} data={round.holes?.[h]||{}} onChange={()=>{}} readonly/>
@@ -395,41 +473,10 @@ function Stats({user}){
     const idx=lsGet("rounds:"+user.username)||[];
     setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
   },[]);
-  const avgGross=rounds.length?(rounds.reduce((s,r)=>s+(r.totalShots||0),0)/rounds.length).toFixed(1):"—";
-  const avgNeto=rounds.length?(rounds.reduce((s,r)=>s+((r.totalShots||0)-(r.hcp||0)),0)/rounds.length).toFixed(1):"—";
-  const best=rounds.length?Math.min(...rounds.map(r=>r.totalShots||999)):"—";
-  const bestNeto=rounds.length?Math.min(...rounds.map(r=>(r.totalShots||0)-(r.hcp||0))):"—";
-  const avgPutts=rounds.length?(rounds.reduce((s,r)=>s+(r.totalPutts||0),0)/rounds.length).toFixed(1):"—";
-  const avgChips=rounds.length?(rounds.reduce((s,r)=>s+(r.totalChips||0),0)/rounds.length).toFixed(1):"—";
   return(
     <div style={S.page}>
       <div style={S.h2}>Mis Estadísticas</div>
-      <div style={{...S.g2,marginBottom:"12px"}}>
-        <div style={{...S.card,textAlign:"center",padding:"18px"}}>
-          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. GROSS</div>
-          <div style={{color:gold,fontSize:"34px",fontWeight:"bold"}}>{avgGross}</div>
-          <div style={{color:"#8a7a5a",fontSize:"11px",marginTop:"4px"}}>mejor: {best===999?"—":best}</div>
-        </div>
-        <div style={{...S.card,textAlign:"center",padding:"18px"}}>
-          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. NETO</div>
-          <div style={{color:gold,fontSize:"34px",fontWeight:"bold"}}>{avgNeto}</div>
-          <div style={{color:"#8a7a5a",fontSize:"11px",marginTop:"4px"}}>mejor: {bestNeto}</div>
-        </div>
-      </div>
-      <div style={{...S.g2,marginBottom:"12px"}}>
-        <div style={{...S.card,textAlign:"center",padding:"14px"}}>
-          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. PUTTS</div>
-          <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{avgPutts}</div>
-        </div>
-        <div style={{...S.card,textAlign:"center",padding:"14px"}}>
-          <div style={{color:"#8a7a5a",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROM. CHIPS</div>
-          <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{avgChips}</div>
-        </div>
-      </div>
-      <div style={{...S.card,textAlign:"center",padding:"14px"}}>
-        <div style={{color:"#8a7a5a",fontSize:"12px"}}>{rounds.length} vuelta{rounds.length!==1?"s":""} registradas · {getCat(user.hcp)} · HCP {user.hcp}</div>
-      </div>
-      <div style={{fontSize:"11px",color:"#8a7a5a",textAlign:"center",padding:"10px",background:"#231f18",borderRadius:"4px"}}>El ranking general lo ve tu coach Adrián.</div>
+      <StatsView rounds={rounds} hcp={user.hcp} isCoach={false}/>
     </div>
   );
 }
@@ -438,6 +485,7 @@ function CoachPanel(){
   const [players,setPlayers]=useState(()=>lsGet("coach:players")||[]);
   const [selPlayer,setSelPlayer]=useState(null);
   const [selRound,setSelRound]=useState(null);
+  const [selPlayerTab,setSelPlayerTab]=useState("vueltas");
   const [code,setCode]=useState("");
   const [msg,setMsg]=useState("");
 
@@ -469,7 +517,7 @@ function CoachPanel(){
       <div style={S.h2}>Panel Coach</div>
       <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"16px"}}>
         {[["import","Importar"],["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"]].map(([t,l])=>(
-          <button key={t} style={S.nb(tab===t)} onClick={()=>{setTab(t);setSelPlayer(null)}}>{l}</button>
+          <button key={t} style={S.nb(tab===t)} onClick={()=>{setTab(t);setSelPlayer(null);setSelPlayerTab("vueltas")}}>{l}</button>
         ))}
       </div>
       {tab==="import"&&(
@@ -514,7 +562,7 @@ function CoachPanel(){
             const p=pkg.user,rs=pkg.rounds;
             const avg=rs.length?(rs.reduce((s,r)=>s+(r.totalShots||0),0)/rs.length).toFixed(1):"—";
             return(
-              <div key={p.username} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelPlayer(pkg)}>
+              <div key={p.username} style={{...S.card,cursor:"pointer"}} onClick={()=>{setSelPlayer(pkg);setSelPlayerTab("vueltas")}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
                     <div style={{color:"#e8dcc8",fontWeight:"bold"}}>{p.name}</div>
@@ -529,22 +577,30 @@ function CoachPanel(){
       {tab==="players"&&selPlayer&&(
         <>
           <button style={{...S.btn("g"),marginBottom:"12px"}} onClick={()=>setSelPlayer(null)}>← Jugadores</button>
-          <div style={S.card}>
-            <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{selPlayer.user.name}</div>
-            <div style={{color:"#8a7a5a",fontSize:"11px",marginBottom:"12px"}}>HCP {selPlayer.user.hcp} · {getCat(selPlayer.user.hcp)}</div>
-            {selPlayer.rounds.map(r=>(
-              <div key={r.id} style={{cursor:"pointer",padding:"9px 0",borderBottom:"1px solid #2d2720",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setSelRound(r)}>
-                <div>
-                  <div style={{color:"#e8dcc8",fontSize:"13px"}}>{r.courseName}</div>
-                  <div style={{color:"#8a7a5a",fontSize:"10px"}}>{r.date} · {r.format}</div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.totalShots}</div>
-                  <div style={{color:"#8a7a5a",fontSize:"10px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
-                </div>
-              </div>
+          <div style={{color:gold,fontSize:"15px",fontWeight:"bold",marginBottom:"4px"}}>{selPlayer.user.name}</div>
+          <div style={{color:"#8a7a5a",fontSize:"11px",marginBottom:"14px"}}>HCP {selPlayer.user.hcp} · {getCat(selPlayer.user.hcp)}</div>
+          <div style={{display:"flex",gap:"6px",marginBottom:"14px"}}>
+            {[["vueltas","Vueltas"],["stats","Estadísticas"]].map(([t,l])=>(
+              <button key={t} style={{...S.nb(selPlayerTab===t),flex:1}} onClick={()=>setSelPlayerTab(t)}>{l}</button>
             ))}
           </div>
+          {selPlayerTab==="stats"&&<StatsView rounds={selPlayer.rounds} hcp={selPlayer.user.hcp} isCoach={true}/>}
+          {selPlayerTab==="vueltas"&&(
+            <div style={S.card}>
+              {selPlayer.rounds.map(r=>(
+                <div key={r.id} style={{cursor:"pointer",padding:"9px 0",borderBottom:"1px solid #2d2720",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setSelRound(r)}>
+                  <div>
+                    <div style={{color:"#e8dcc8",fontSize:"13px"}}>{r.courseName}</div>
+                    <div style={{color:"#8a7a5a",fontSize:"10px"}}>{r.date} · {r.format}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.totalShots}</div>
+                    <div style={{color:"#8a7a5a",fontSize:"10px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
       {tab==="rounds"&&(
