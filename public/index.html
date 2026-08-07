@@ -92,7 +92,7 @@ const COURSES=[
   {id:"montermos",name:"Montermos Golf Club",holes:18,par:72,city:"Monte Hermoso"},
 ];
 
-const FORMATS_ALL=["Strokeplay","Stableford","Match Play","Fourball","Foursome","Mulligan","Stableford Neto por Hoyo"];
+const FORMATS_ALL=["Strokeplay","Stableford","Match Play","Fourball","Foursome","Mulligan","Stableford Neto por Hoyo","Fourball Match Play"];
 const FORMATS_A=["Strokeplay","Stableford","Match Play","Fourball","Golpe Alternado","Fourball Match Play"];
 const ZONES=["Caminata","Zona de Reflexión","Zona de Colocación","Zona de Ejecución","Posterior al Golpe"];
 
@@ -353,14 +353,16 @@ function NewRound({user,onSave,onCancel}){
   async function save(){
     if(!meta.courseId){setErr("Seleccioná una cancha.");return}
     setSaving(true);
-    const id=Date.now().toString();
-    const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,holes,totalShots,totalPutts,totalChips,totalBunker,createdAt:Date.now()};
-    lsSet("round:"+id,round);
-    const idx=lsGet("rounds:"+user.username)||[];
-    idx.push(id);lsSet("rounds:"+user.username,idx);
-    await sbUpsert("rounds",{id,username:user.username,player_name:user.name,course_id:meta.courseId,course_name:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpt:meta.hcpT,holes:round.holes,total_shots:totalShots,total_putts:totalPutts,total_chips:totalChips,total_bunker:totalBunker,created_at:Date.now()});
-    setSaving(false);
-    onSave();
+    try{
+      const id=Date.now().toString();
+      const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,holes,totalShots,totalPutts,totalChips,totalBunker,createdAt:Date.now()};
+      lsSet("round:"+id,round);
+      const idx=lsGet("rounds:"+user.username)||[];
+      idx.push(id);lsSet("rounds:"+user.username,idx);
+      await sbUpsert("rounds",{id,username:user.username,player_name:user.name,course_id:meta.courseId,course_name:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpt:meta.hcpT,holes:round.holes,total_shots:totalShots,total_putts:totalPutts,total_chips:totalChips,total_bunker:totalBunker,created_at:Date.now()});
+      onSave();
+    }catch(e){setErr("Error al guardar.");}
+    finally{setSaving(false);}
   }
 
   return(
@@ -460,19 +462,28 @@ function RoundDetail({round,onBack,coachView}){
 function MyRounds({user}){
   const [rounds,setRounds]=useState([]);
   const [selected,setSelected]=useState(null);
+  const [loading,setLoading]=useState(true);
 
   useEffect(()=>{
     (async()=>{
-      const sbRounds=await sbGetAll("rounds",{username:user.username});
-      if(sbRounds&&sbRounds.length){
-        const mapped=sbRounds.map(r=>({id:r.id,username:r.username,playerName:r.player_name,courseId:r.course_id,courseName:r.course_name,date:r.date,format:r.format,hcp:r.hcp,hcpT:r.hcpt,holes:r.holes||{},totalShots:r.total_shots,totalPutts:r.total_putts,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,createdAt:r.created_at}));
-        setRounds(mapped);
-      } else {
+      setLoading(true);
+      try{
+        const sbRounds=await sbGetAll("rounds",{username:user.username});
+        if(sbRounds&&sbRounds.length){
+          const mapped=sbRounds.map(r=>({id:r.id,username:r.username,playerName:r.player_name,courseId:r.course_id,courseName:r.course_name,date:r.date,format:r.format,hcp:r.hcp,hcpT:r.hcpt,holes:r.holes||{},totalShots:r.total_shots,totalPutts:r.total_putts,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,createdAt:r.created_at}));
+          setRounds(mapped);
+        } else {
+          const idx=lsGet("rounds:"+user.username)||[];
+          const loaded=idx.map(id=>lsGet("round:"+id)).filter(Boolean);
+          loaded.sort((a,b)=>b.createdAt-a.createdAt);
+          setRounds(loaded);
+        }
+      }catch(e){
         const idx=lsGet("rounds:"+user.username)||[];
         const loaded=idx.map(id=>lsGet("round:"+id)).filter(Boolean);
-        loaded.sort((a,b)=>b.createdAt-a.createdAt);
         setRounds(loaded);
       }
+      setLoading(false);
     })();
   },[]);
 
@@ -496,7 +507,8 @@ function MyRounds({user}){
         <div style={S.h2}>Mis Vueltas</div>
         <button style={{...S.btn("p"),fontSize:"11px",padding:"7px 12px"}} onClick={sendWhatsApp}>📲 Enviar al coach</button>
       </div>
-      {rounds.length===0&&(
+      {loading&&<div style={{color:"#b09050",textAlign:"center",padding:"20px"}}>Cargando...</div>}
+      {!loading&&rounds.length===0&&(
         <div style={{...S.card,textAlign:"center",color:"#b09050",padding:"40px 20px"}}>
           <div style={{fontSize:"32px",marginBottom:"10px"}}>⛳</div>
           <div>Todavía no registraste ninguna vuelta.</div>
@@ -526,10 +538,15 @@ function Stats({user}){
   const [rounds,setRounds]=useState([]);
   useEffect(()=>{
     (async()=>{
-      const sbRounds=await sbGetAll("rounds",{username:user.username});
-      if(sbRounds&&sbRounds.length){
-        setRounds(sbRounds.map(r=>({id:r.id,totalShots:r.total_shots,totalPutts:r.total_putts,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,hcp:r.hcp,holes:r.holes||{}})));
-      } else {
+      try{
+        const sbRounds=await sbGetAll("rounds",{username:user.username});
+        if(sbRounds&&sbRounds.length){
+          setRounds(sbRounds.map(r=>({id:r.id,totalShots:r.total_shots,totalPutts:r.total_putts,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,hcp:r.hcp,holes:r.holes||{}})));
+        } else {
+          const idx=lsGet("rounds:"+user.username)||[];
+          setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
+        }
+      }catch(e){
         const idx=lsGet("rounds:"+user.username)||[];
         setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
       }
@@ -542,8 +559,62 @@ function Stats({user}){
     </div>
   );
 }
+
+function Profile({user,onUpdate}){
+  const [f,setF]=useState({hcp:user.hcp||18,hcpT:user.hcpT||"libre"});
+  const [notas,setNotas]=useState({});
+  const [msg,setMsg]=useState("");
+
+  useEffect(()=>{
+    (async()=>{
+      const stored=lsGet("notas:"+user.username)||{};
+      setNotas(stored);
+      const sb=await sbGet("users",{username:user.username});
+      if(sb&&sb.notas) setNotas(sb.notas);
+    })();
+  },[]);
+
+  async function save(){
+    const u={...user,hcp:parseFloat(f.hcp)||0,hcpT:f.hcpT};
+    lsSet("user:"+user.username,u);
+    lsSet("session",u);
+    lsSet("notas:"+user.username,notas);
+    await sbUpsert("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,joined_at:user.joinedAt||Date.now(),notas});
+    onUpdate(u);
+    setMsg("✓ Perfil actualizado.");
+  }
+
+  return(
+    <div style={S.page}>
+      <div style={S.h2}>Mi Perfil</div>
+      <div style={S.card}>
+        <div style={{fontSize:"20px",color:"#f5ead0",fontWeight:"bold"}}>{user.name}</div>
+        <div style={{color:"#b09050",fontSize:"12px",marginTop:"3px",marginBottom:"14px"}}>@{user.username}</div>
+        {msg&&<div style={S.alt("s")}>{msg}</div>}
+        <div style={{...S.g2,marginBottom:"14px"}}>
+          <div><label style={S.lbl}>Handicap</label><input style={S.inp} type="number" min="0" max="54" value={f.hcp} onChange={e=>setF(p=>({...p,hcp:e.target.value}))}/></div>
+          <div><label style={S.lbl}>Tipo</label>
+            <select style={S.sel} value={f.hcpT} onChange={e=>setF(p=>({...p,hcpT:e.target.value}))}>
+              <option value="libre">Libre</option><option value="aag">Oficial AAG</option>
+            </select>
+          </div>
+        </div>
+        <div style={{borderTop:"1px solid #5a4a20",paddingTop:"14px",marginBottom:"14px"}}>
+          <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Notas mentales de juego</div>
+          {[...ZONES,"Nota general"].map(z=>(
+            <div key={z} style={{marginBottom:"10px"}}>
+              <label style={S.lbl}>{z}</label>
+              <textarea style={{...S.inp,minHeight:"52px",resize:"vertical"}} placeholder={`Mi recordatorio para ${z.toLowerCase()}...`} value={notas[z]||""} onChange={e=>setNotas(n=>({...n,[z]:e.target.value}))}/>
+            </div>
+          ))}
+        </div>
+        <button style={{...S.btn("p"),width:"100%",padding:"11px"}} onClick={save}>Guardar cambios</button>
+      </div>
+    </div>
+  );
+}
 function CoachPanel(){
-  const [tab,setTab]=useState("import");
+  const [tab,setTab]=useState("ranking");
   const [players,setPlayers]=useState([]);
   const [selPlayer,setSelPlayer]=useState(null);
   const [selRound,setSelRound]=useState(null);
@@ -558,20 +629,16 @@ function CoachPanel(){
     setLoading(true);
     try{
       const sbRounds=await sbGetAll("rounds");
-      if(sbRounds&&sbRounds.length){
-        const mapped=sbRounds.map(r=>({id:r.id,username:r.username,playerName:r.player_name,courseId:r.course_id,courseName:r.course_name,date:r.date,format:r.format,hcp:r.hcp,hcpT:r.hcpt,holes:r.holes||{},totalShots:r.total_shots,totalPutts:r.total_putts,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,createdAt:r.created_at}));
-        const sbUsers=await sbGetAll("users");
-        const userMap={};
-        (sbUsers||[]).forEach(u=>{userMap[u.username]={username:u.username,name:u.name,hcp:u.hcp,hcpT:u.hcpt}});
-        const byPlayer={};
-        mapped.forEach(r=>{
-          if(!byPlayer[r.username]) byPlayer[r.username]={user:userMap[r.username]||{username:r.username,name:r.playerName,hcp:r.hcp},rounds:[]};
-          byPlayer[r.username].rounds.push(r);
-        });
-        setPlayers(Object.values(byPlayer));
-      } else {
-        setPlayers(lsGet("coach:players")||[]);
-      }
+      const sbUsers=await sbGetAll("users");
+      const userMap={};
+      (sbUsers||[]).forEach(u=>{userMap[u.username]={username:u.username,name:u.name,hcp:u.hcp,hcpT:u.hcpt,notas:u.notas||{}}});
+      const byPlayer={};
+      (sbRounds||[]).forEach(r=>{
+        if(!byPlayer[r.username]) byPlayer[r.username]={user:userMap[r.username]||{username:r.username,name:r.player_name,hcp:r.hcp},rounds:[]};
+        byPlayer[r.username].rounds.push({id:r.id,username:r.username,playerName:r.player_name,courseId:r.course_id,courseName:r.course_name,date:r.date,format:r.format,hcp:r.hcp,hcpT:r.hcpt,holes:r.holes||{},totalShots:r.total_shots,totalPutts:r.total_putts,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,createdAt:r.created_at});
+      });
+      const result=Object.values(byPlayer);
+      setPlayers(result.length?result:lsGet("coach:players")||[]);
     }catch(e){setPlayers(lsGet("coach:players")||[]);}
     finally{setLoading(false);}
   }
@@ -607,24 +674,15 @@ function CoachPanel(){
     <div style={S.page}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
         <div style={S.h2}>Panel Coach</div>
-        <button style={{...S.btn("g"),fontSize:"11px",padding:"6px 10px"}} onClick={loadAll}>{loading?"⟳ Actualizando...":"⟳ Actualizar"}</button>
+        <button style={{...S.btn("g"),fontSize:"11px",padding:"6px 10px"}} onClick={loadAll}>{loading?"⟳...":"⟳ Actualizar"}</button>
       </div>
       <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"16px"}}>
-        {[["import","Importar"],["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"]].map(([t,l])=>(
+        {[["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"],["import","Importar"]].map(([t,l])=>(
           <button key={t} style={S.nb(tab===t)} onClick={()=>{setTab(t);setSelPlayer(null);setSelPlayerTab("vueltas")}}>{l}</button>
         ))}
       </div>
       {loading&&<div style={{color:"#b09050",padding:"20px",textAlign:"center"}}>Cargando datos...</div>}
-      {tab==="import"&&(
-        <div style={S.card}>
-          <div style={S.h2}>Importar datos de alumno</div>
-          <div style={{fontSize:"12px",color:"#b09050",marginBottom:"12px"}}>Si un alumno te mandó el código por WhatsApp, pegalo acá. Los nuevos registros se sincronizan automáticamente.</div>
-          {msg&&<div style={S.alt(msg.includes("✓")?"s":"e")}>{msg}</div>}
-          <label style={S.lbl}>Código del alumno (opcional)</label>
-          <textarea style={{...S.inp,minHeight:"80px",resize:"vertical",fontSize:"11px",wordBreak:"break-all",marginBottom:"10px"}} placeholder="Pegá el código acá..." value={code} onChange={e=>setCode(e.target.value)}/>
-          <button style={{...S.btn("p"),width:"100%",padding:"11px"}} onClick={importPlayer}>Importar datos</button>
-        </div>
-      )}
+
       {tab==="ranking"&&!loading&&(
         rank.length===0
           ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay datos aún. Los alumnos deben registrar vueltas primero.</div>
@@ -650,6 +708,7 @@ function CoachPanel(){
             );
           })
       )}
+
       {tab==="players"&&!loading&&!selPlayer&&(
         players.length===0
           ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay alumnos aún.</div>
@@ -669,19 +728,35 @@ function CoachPanel(){
             );
           })
       )}
+
       {tab==="players"&&selPlayer&&(
         <>
           <button style={{...S.btn("g"),marginBottom:"12px"}} onClick={()=>setSelPlayer(null)}>← Jugadores</button>
           <div style={{color:gold,fontSize:"15px",fontWeight:"bold",marginBottom:"4px"}}>{selPlayer.user.name}</div>
           <div style={{color:"#b09050",fontSize:"11px",marginBottom:"14px"}}>HCP {selPlayer.user.hcp} · {getCat(selPlayer.user.hcp)}</div>
-          <div style={{display:"flex",gap:"6px",marginBottom:"14px"}}>
-            {[["vueltas","Vueltas"],["stats","Estadísticas"]].map(([t,l])=>(
+          <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"14px"}}>
+            {[["vueltas","Vueltas"],["stats","Estadísticas"],["notas","Notas mentales"]].map(([t,l])=>(
               <button key={t} style={{...S.nb(selPlayerTab===t),flex:1}} onClick={()=>setSelPlayerTab(t)}>{l}</button>
             ))}
           </div>
           {selPlayerTab==="stats"&&<StatsView rounds={selPlayer.rounds} hcp={selPlayer.user.hcp} isCoach={true}/>}
+          {selPlayerTab==="notas"&&(
+            <div style={S.card}>
+              <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Notas mentales</div>
+              {Object.keys(selPlayer.user.notas||{}).length===0&&(
+                <div style={{color:"#b09050",fontSize:"13px"}}>Este alumno todavía no cargó notas mentales.</div>
+              )}
+              {[...ZONES,"Nota general"].map(z=>selPlayer.user.notas?.[z]&&(
+                <div key={z} style={{marginBottom:"12px"}}>
+                  <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"4px"}}>{z}</div>
+                  <div style={{color:"#f5ead0",fontSize:"13px",background:"#141210",padding:"10px",borderRadius:"4px",border:"1px solid #5a4a20"}}>{selPlayer.user.notas[z]}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {selPlayerTab==="vueltas"&&(
             <div style={S.card}>
+              {selPlayer.rounds.length===0&&<div style={{color:"#b09050"}}>Sin vueltas registradas.</div>}
               {selPlayer.rounds.map(r=>(
                 <div key={r.id} style={{cursor:"pointer",padding:"9px 0",borderBottom:"1px solid #3a3020",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setSelRound(r)}>
                   <div>
@@ -698,6 +773,7 @@ function CoachPanel(){
           )}
         </>
       )}
+
       {tab==="rounds"&&!loading&&(
         allRounds().length===0
           ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay vueltas aún.</div>
@@ -716,36 +792,17 @@ function CoachPanel(){
             </div>
           ))
       )}
-    </div>
-  );
-}
 
-function Profile({user,onUpdate}){
-  const [f,setF]=useState({hcp:user.hcp||18,hcpT:user.hcpT||"libre"});
-  const [msg,setMsg]=useState("");
-  async function save(){
-    const u={...user,hcp:parseFloat(f.hcp)||0,hcpT:f.hcpT};
-    lsSet("user:"+user.username,u);lsSet("session",u);
-    await sbUpsert("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,joined_at:user.joinedAt||Date.now()});
-    onUpdate(u);setMsg("✓ Perfil actualizado.");
-  }
-  return(
-    <div style={S.page}>
-      <div style={S.h2}>Mi Perfil</div>
-      <div style={S.card}>
-        <div style={{fontSize:"20px",color:"#f5ead0",fontWeight:"bold"}}>{user.name}</div>
-        <div style={{color:"#b09050",fontSize:"12px",marginTop:"3px",marginBottom:"14px"}}>@{user.username}</div>
-        {msg&&<div style={S.alt("s")}>{msg}</div>}
-        <div style={{...S.g2,marginBottom:"12px"}}>
-          <div><label style={S.lbl}>Handicap</label><input style={S.inp} type="number" min="0" max="54" value={f.hcp} onChange={e=>setF(p=>({...p,hcp:e.target.value}))}/></div>
-          <div><label style={S.lbl}>Tipo</label>
-            <select style={S.sel} value={f.hcpT} onChange={e=>setF(p=>({...p,hcpT:e.target.value}))}>
-              <option value="libre">Libre</option><option value="aag">Oficial AAG</option>
-            </select>
-          </div>
+      {tab==="import"&&(
+        <div style={S.card}>
+          <div style={S.h2}>Importar datos de alumno</div>
+          <div style={{fontSize:"12px",color:"#b09050",marginBottom:"12px"}}>Los datos nuevos se sincronizan automáticamente. Si un alumno te mandó código por WhatsApp, pegalo acá.</div>
+          {msg&&<div style={S.alt(msg.includes("✓")?"s":"e")}>{msg}</div>}
+          <label style={S.lbl}>Código del alumno (opcional)</label>
+          <textarea style={{...S.inp,minHeight:"80px",resize:"vertical",fontSize:"11px",wordBreak:"break-all",marginBottom:"10px"}} placeholder="Pegá el código acá..." value={code} onChange={e=>setCode(e.target.value)}/>
+          <button style={{...S.btn("p"),width:"100%",padding:"11px"}} onClick={importPlayer}>Importar datos</button>
         </div>
-        <button style={S.btn("p")} onClick={save}>Guardar cambios</button>
-      </div>
+      )}
     </div>
   );
 }
