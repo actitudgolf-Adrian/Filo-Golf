@@ -28,7 +28,7 @@ const {useState,useEffect}=React;
 const gold="#C9A84C";
 
 const SUPABASE_URL="https://qrkxzgwycuvtirlurmec.supabase.co";
-const SUPABASE_KEY="sb_publishable_e3e9LCWNXsF6SoCgQBq14w_VWZktOD0";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFya3h6Z3d5Y3V2dGlybHVybWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNzU2MDksImV4cCI6MjA5OTc1MTYwOX0.B7yIQMSW6u8O7P6IsDaTdqk1IxFU3nSkngVx2lmaSMs";
 
 function lsGet(k){try{const v=localStorage.getItem("fg_"+k);return v?JSON.parse(v):null}catch{return null}}
 function lsSet(k,v){try{localStorage.setItem("fg_"+k,JSON.stringify(v));return true}catch{return false}}
