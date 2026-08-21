@@ -80,8 +80,6 @@ const S={
   lbl:{fontSize:"11px",color:"#b09050",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
   g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"},
   alt:t=>({background:t==="e"?"#3a1010":"#1a2a1a",border:`1px solid ${t==="e"?"#7a2020":"#2a5a2a"}`,borderRadius:"4px",padding:"9px 13px",fontSize:"13px",color:t==="e"?"#e88":"#8e8",marginBottom:"12px"}),
-  hHdr:{display:"grid",gridTemplateColumns:"22px 32px 32px 1fr 1fr 1fr 1fr 1fr 36px",gap:"3px",padding:"4px 0 8px",borderBottom:"2px solid #7a6030"},
-  hRow:{display:"grid",gridTemplateColumns:"22px 32px 32px 1fr 1fr 1fr 1fr 1fr 36px",gap:"3px",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #3a3020"},
 };
 
 function StatCard({label,value,sub}){
@@ -227,67 +225,91 @@ function HoleCard({hole,data,onChange,readonly}){
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
   const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note||d.salida;
-  const ii={...S.inp,textAlign:"center",padding:"7px 2px",fontSize:"14px"};
-  const is={...S.inp,textAlign:"center",padding:"7px 2px",fontSize:"11px"};
+  const bigInp={...S.inp,fontSize:"22px",padding:"14px",textAlign:"center",fontWeight:"bold"};
+  const smInp={...S.inp,fontSize:"16px",padding:"11px",textAlign:"center"};
+  const ctrBtn={...S.btn("g"),padding:"10px 18px",fontSize:"22px",lineHeight:1,minWidth:"50px"};
   return(
-    <div style={{borderBottom:"1px solid #3a3020",paddingBottom:"7px",marginBottom:"7px"}}>
-      <div style={S.hRow}>
-        <div style={{color:gold,fontWeight:"bold",textAlign:"center",fontSize:"13px"}}>{hole}</div>
-        <input style={is} type="number" min="3" max="6" placeholder="par" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/>
-        <input style={is} type="number" min="0" max="999" placeholder="mts" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/>
-        <input style={ii} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
-        <input style={ii} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"2px"}}>
-          {!readonly
-            ?<><button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
-              <span style={{color:"#f5ead0",fontSize:"12px",minWidth:"14px",textAlign:"center"}}>{d.chips||0}</span>
-              <button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
-            :<span style={{color:"#f5ead0",fontSize:"12px",textAlign:"center"}}>{d.chips||0}</span>
-          }
+    <div style={{background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"8px",padding:"16px",marginBottom:"14px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",paddingBottom:"10px",borderBottom:"1px solid #5a4a20"}}>
+        <div style={{color:gold,fontWeight:"bold",fontSize:"22px",letterSpacing:"2px"}}>HOYO {hole}</div>
+        {!readonly&&<button style={{...S.btn("g"),padding:"8px 14px",fontSize:"13px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲ Cerrar":"📝 Notas"}</button>}
+        {readonly&&hasNotes&&<span style={{fontSize:"18px"}}>📝</span>}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+        <div>
+          <label style={S.lbl}>Par</label>
+          <input style={smInp} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/>
         </div>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"2px"}}>
-          {!readonly
-            ?<><button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("bunker",Math.max(0,(parseInt(d.bunker)||0)-1))}>−</button>
-              <span style={{color:"#f5ead0",fontSize:"12px",minWidth:"14px",textAlign:"center"}}>{d.bunker||0}</span>
-              <button style={{...S.btn("g"),padding:"2px 5px",fontSize:"13px",lineHeight:1}} onClick={()=>upd("bunker",(parseInt(d.bunker)||0)+1)}>+</button></>
-            :<span style={{color:"#f5ead0",fontSize:"12px",textAlign:"center"}}>{d.bunker||0}</span>
-          }
+        <div>
+          <label style={S.lbl}>Distancia del hoyo (yds)</label>
+          <input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/>
         </div>
-        <input style={is} type="number" min="0" max="999" placeholder="yds" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
-        {!readonly
-          ?<button style={{...S.btn("g"),padding:"4px 7px",fontSize:"12px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲":"📝"}</button>
-          :<div style={{textAlign:"center"}}>{hasNotes&&<span style={{fontSize:"12px"}}>📝</span>}</div>
-        }
+      </div>
+      <div style={{marginBottom:"12px"}}>
+        <label style={S.lbl}>Golpes</label>
+        <input style={bigInp} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
+      </div>
+      <div style={{marginBottom:"12px"}}>
+        <label style={S.lbl}>Putts</label>
+        <input style={bigInp} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+        <div>
+          <label style={S.lbl}>Chip</label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",padding:"8px"}}>
+            {!readonly
+              ?<><button style={ctrBtn} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
+                <span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.chips||0}</span>
+                <button style={ctrBtn} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
+              :<span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.chips||0}</span>
+            }
+          </div>
+        </div>
+        <div>
+          <label style={S.lbl}>Búnker</label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",padding:"8px"}}>
+            {!readonly
+              ?<><button style={ctrBtn} onClick={()=>upd("bunker",Math.max(0,(parseInt(d.bunker)||0)-1))}>−</button>
+                <span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.bunker||0}</span>
+                <button style={ctrBtn} onClick={()=>upd("bunker",(parseInt(d.bunker)||0)+1)}>+</button></>
+              :<span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.bunker||0}</span>
+            }
+          </div>
+        </div>
+      </div>
+      <div style={{marginBottom:"10px"}}>
+        <label style={S.lbl}>Dist. tiro a green (yds)</label>
+        <input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
       </div>
       {open&&!readonly&&(
-        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"4px",padding:"12px",marginTop:"6px"}}>
-          <div style={{fontSize:"9px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Anotaciones — Hoyo {hole}</div>
+        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"14px",marginTop:"10px"}}>
+          <div style={{fontSize:"10px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Anotaciones — Hoyo {hole}</div>
           <label style={S.lbl}>Tiro de salida (opcional)</label>
-          <div style={{display:"flex",gap:"6px",marginBottom:"10px"}}>
+          <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
             {["Fairway","Rough","Penalidad"].map(op=>(
-              <button key={op} style={{...S.btn(d.salida===op?"p":"g"),flex:1,padding:"6px 4px",fontSize:"11px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
+              <button key={op} style={{...S.btn(d.salida===op?"p":"g"),flex:1,padding:"10px 4px",fontSize:"13px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
             ))}
           </div>
           {ZONES.map(z=>(
-            <div key={z} style={{marginBottom:"7px"}}>
+            <div key={z} style={{marginBottom:"10px"}}>
               <label style={S.lbl}>{z}</label>
               <input style={S.inp} placeholder="Nota..." value={d.zones?.[z]||""} onChange={e=>updZ(z,e.target.value)}/>
             </div>
           ))}
           <label style={S.lbl}>Anotación libre</label>
-          <textarea style={{...S.inp,minHeight:"50px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
+          <textarea style={{...S.inp,minHeight:"60px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
         </div>
       )}
       {readonly&&hasNotes&&(
-        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"4px",padding:"10px",marginTop:"5px"}}>
-          {d.salida&&<div style={{marginBottom:"5px"}}><span style={{color:"#b09050",fontSize:"10px"}}>Salida: </span><span style={{color:"#f5ead0",fontSize:"12px"}}>{d.salida}</span></div>}
+        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px",marginTop:"10px"}}>
+          {d.salida&&<div style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>Salida: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.salida}</span></div>}
           {ZONES.map(z=>d.zones?.[z]&&(
-            <div key={z} style={{marginBottom:"5px"}}>
-              <span style={{color:"#b09050",fontSize:"10px"}}>{z}: </span>
-              <span style={{color:"#f5ead0",fontSize:"12px"}}>{d.zones[z]}</span>
+            <div key={z} style={{marginBottom:"6px"}}>
+              <span style={{color:"#b09050",fontSize:"11px"}}>{z}: </span>
+              <span style={{color:"#f5ead0",fontSize:"13px"}}>{d.zones[z]}</span>
             </div>
           ))}
-          {d.note&&<div><span style={{color:"#b09050",fontSize:"10px"}}>Libre: </span><span style={{color:"#f5ead0",fontSize:"12px"}}>{d.note}</span></div>}
+          {d.note&&<div><span style={{color:"#b09050",fontSize:"11px"}}>Libre: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.note}</span></div>}
         </div>
       )}
     </div>
@@ -355,25 +377,22 @@ function NewRound({user,onSave,onCancel}){
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"12px",flexWrap:"wrap",gap:"6px"}}>
             <div>
               <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{course?.name}</div>
-              <div style={{color:"#b09050",fontSize:"11px"}}>{meta.date} · {meta.format} · HCP {meta.hcp} · {holeCount} hoyos</div>
+              <div style={{color:"#b09050",fontSize:"11px"}}>{meta.date} · {meta.format} · HCP {meta.hcp}</div>
             </div>
             <div style={{textAlign:"right"}}>
               <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{totalShots||"—"}</div>
               <div style={{color:"#b09050",fontSize:"10px"}}>{totalPutts} putts · {totalChips} chips · {totalBunker} búnker</div>
             </div>
           </div>
-          {err&&<div style={S.alt("e")}>{err}</div>}
-          <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"10px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"14px"}}>
             <label style={{...S.lbl,marginBottom:0}}>Hoyos:</label>
             <input style={{...S.inp,width:"70px",textAlign:"center"}} type="number" min="1" max="36" value={meta.numHoles} onChange={e=>setMeta(m=>({...m,numHoles:e.target.value}))}/>
           </div>
-          <div style={S.hHdr}>
-            {["H","PAR","MTS","GOLPES","PUTTS","CHIP","BÚNKER","AL GREEN","NOTAS"].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#b09050",textAlign:"center"}}>{h}</div>)}
-          </div>
+          {err&&<div style={S.alt("e")}>{err}</div>}
           {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
             <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false}/>
           ))}
-          <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderTop:"2px solid #7a6030",marginTop:"6px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderTop:"2px solid #7a6030",marginTop:"6px"}}>
             <div style={{color:"#b09050",fontSize:"12px"}}>Putts: <span style={{color:"#f5ead0"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:"#f5ead0"}}>{totalChips}</span> · Búnker: <span style={{color:"#f5ead0"}}>{totalBunker}</span></div>
             <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>Total: {totalShots||"—"}</div>
           </div>
@@ -404,9 +423,6 @@ function RoundDetail({round,onBack,coachView}){
             <div style={{color:"#b09050",fontSize:"11px"}}>{round.totalPutts} putts · {round.totalChips||0} chips · {round.totalBunker||0} búnker</div>
             <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {(round.totalShots||0)-(round.hcp||0)}</div>
           </div>
-        </div>
-        <div style={S.hHdr}>
-          {["H","PAR","MTS","GOLPES","PUTTS","CHIP","BÚNKER","AL GREEN",""].map((h,i)=><div key={i} style={{fontSize:"9px",color:"#b09050",textAlign:"center"}}>{h}</div>)}
         </div>
         {Array.from({length:count},(_,i)=>i+1).map(h=>(
           <HoleCard key={h} hole={h} data={round.holes?.[h]||{}} onChange={()=>{}} readonly/>
