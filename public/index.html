@@ -318,15 +318,19 @@ function HoleCard({hole,data,onChange,readonly}){
 
 function NewRound({user,onSave,onCancel}){
   const [step,setStep]=useState(1);
-  const [meta,setMeta]=useState({courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18});
+  const [meta,setMeta]=useState({courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18,savedConfig:""});
   const [holes,setHoles]=useState({});
   const [err,setErr]=useState("");
+  const [savedConfigs,setSavedConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
+  const [showSaveCfg,setShowSaveCfg]=useState(false);
+  const [cfgName,setCfgName]=useState("");
   const course=COURSES.find(c=>c.id===meta.courseId);
   const holeCount=parseInt(meta.numHoles)||18;
   const totalShots=Object.values(holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0);
   const totalPutts=Object.values(holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0);
   const totalChips=Object.values(holes).reduce((s,h)=>s+(parseInt(h.chips)||0),0);
   const totalBunker=Object.values(holes).reduce((s,h)=>s+(parseInt(h.bunker)||0),0);
+  const hasDist=Object.values(holes).some(h=>h.dist);
 
   function save(){
     if(!meta.courseId){setErr("Seleccioná una cancha.");return}
@@ -337,6 +341,21 @@ function NewRound({user,onSave,onCancel}){
     idx.push(id);lsSet("rounds:"+user.username,idx);
     onSave();
   }
+
+  function saveConfig(){
+    if(!cfgName.trim())return;
+    const key=meta.courseId+"|"+Date.now();
+    const holesOnly={};
+    Object.entries(holes).forEach(([h,d])=>{holesOnly[h]={par:d.par,dist:d.dist}});
+    const configs=lsGet("configs:"+user.username)||{};
+    configs[key]={name:cfgName.trim(),courseId:meta.courseId,holes:holesOnly,savedAt:Date.now()};
+    lsSet("configs:"+user.username,configs);
+    setSavedConfigs(configs);
+    setShowSaveCfg(false);
+    alert("✓ Configuración guardada: "+cfgName.trim());
+  }
+
+  const configsForCourse=Object.keys(savedConfigs).filter(k=>k.startsWith(meta.courseId+"|"));
 
   return(
     <div style={S.page}>
@@ -349,10 +368,31 @@ function NewRound({user,onSave,onCancel}){
           <div style={S.h2}>Datos de la vuelta</div>
           {err&&<div style={S.alt("e")}>{err}</div>}
           <label style={S.lbl}>Cancha</label>
-          <select style={{...S.sel,marginBottom:"11px"}} value={meta.courseId} onChange={e=>setMeta(m=>({...m,courseId:e.target.value}))}>
+          <select style={{...S.sel,marginBottom:"11px"}} value={meta.courseId} onChange={e=>{setMeta(m=>({...m,courseId:e.target.value,savedConfig:""}));setSavedConfigs(lsGet("configs:"+user.username)||{});}}>
             <option value="">Seleccioná una cancha</option>
             {COURSES.map(c=><option key={c.id} value={c.id}>{c.name} — {c.city}</option>)}
           </select>
+          {meta.courseId&&configsForCourse.length>0&&(
+            <div style={{marginBottom:"11px"}}>
+              <label style={S.lbl}>Configuración guardada (opcional)</label>
+              <select style={S.sel} value={meta.savedConfig||""} onChange={e=>{
+                const cfg=savedConfigs[e.target.value];
+                if(cfg){
+                  const newHoles={};
+                  Object.entries(cfg.holes||{}).forEach(([h,d])=>{newHoles[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
+                  setHoles(newHoles);
+                  setMeta(m=>({...m,savedConfig:e.target.value,numHoles:Object.keys(cfg.holes||{}).length}));
+                } else {
+                  setMeta(m=>({...m,savedConfig:""}));
+                }
+              }}>
+                <option value="">Sin configuración guardada</option>
+                {configsForCourse.map(k=>(
+                  <option key={k} value={k}>{savedConfigs[k].name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <label style={S.lbl}>Cantidad de hoyos</label>
           <input style={{...S.inp,marginBottom:"11px"}} type="number" min="1" max="36" value={meta.numHoles} onChange={e=>setMeta(m=>({...m,numHoles:e.target.value}))}/>
           <label style={S.lbl}>Fecha</label>
@@ -396,6 +436,21 @@ function NewRound({user,onSave,onCancel}){
             <div style={{color:"#b09050",fontSize:"12px"}}>Putts: <span style={{color:"#f5ead0"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:"#f5ead0"}}>{totalChips}</span> · Búnker: <span style={{color:"#f5ead0"}}>{totalBunker}</span></div>
             <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>Total: {totalShots||"—"}</div>
           </div>
+          {hasDist&&(
+            <div style={{marginTop:"10px"}}>
+              {!showSaveCfg
+                ?<button style={{...S.btn("g"),width:"100%",padding:"10px"}} onClick={()=>{setShowSaveCfg(true);setCfgName(course?.name||"");}}>💾 Guardar configuración de cancha</button>
+                :<div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px"}}>
+                  <label style={S.lbl}>Nombre de la configuración</label>
+                  <input style={{...S.inp,marginBottom:"8px"}} placeholder="Ej: Cañuelas Roja, Hurlingham Azul..." value={cfgName} onChange={e=>setCfgName(e.target.value)}/>
+                  <div style={{display:"flex",gap:"8px"}}>
+                    <button style={S.btn("g")} onClick={()=>setShowSaveCfg(false)}>Cancelar</button>
+                    <button style={{...S.btn("p"),flex:1}} onClick={saveConfig}>Guardar</button>
+                  </div>
+                </div>
+              }
+            </div>
+          )}
           <div style={{display:"flex",gap:"8px",marginTop:"12px"}}>
             <button style={S.btn("g")} onClick={()=>setStep(1)}>← Atrás</button>
             <button style={{...S.btn("p"),flex:1,padding:"11px"}} onClick={save}>Guardar vuelta ✓</button>
@@ -506,6 +561,7 @@ function Stats({user}){
 function Profile({user,onUpdate}){
   const [f,setF]=useState({hcp:user.hcp||18,hcpT:user.hcpT||"libre"});
   const [notas,setNotas]=useState(()=>lsGet("notas:"+user.username)||{});
+  const [configs,setConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
   const [msg,setMsg]=useState("");
 
   function save(){
@@ -515,6 +571,13 @@ function Profile({user,onUpdate}){
     lsSet("notas:"+user.username,notas);
     onUpdate(u);
     setMsg("✓ Perfil actualizado.");
+  }
+
+  function deleteConfig(key){
+    const c=lsGet("configs:"+user.username)||{};
+    delete c[key];
+    lsSet("configs:"+user.username,c);
+    setConfigs({...c});
   }
 
   return(
@@ -543,6 +606,24 @@ function Profile({user,onUpdate}){
         </div>
         <button style={{...S.btn("p"),width:"100%",padding:"11px"}} onClick={save}>Guardar cambios</button>
       </div>
+      {Object.keys(configs).length>0&&(
+        <div style={S.card}>
+          <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Mis configuraciones de cancha</div>
+          {Object.keys(configs).map(k=>{
+            const cfg=configs[k];
+            const course=COURSES.find(c=>c.id===cfg.courseId);
+            return(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+                <div>
+                  <div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div>
+                </div>
+                <button style={{...S.btn("d"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>deleteConfig(k)}>Borrar</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -639,7 +720,7 @@ function CoachPanel(){
           <div style={{color:gold,fontSize:"15px",fontWeight:"bold",marginBottom:"4px"}}>{selPlayer.user.name}</div>
           <div style={{color:"#b09050",fontSize:"11px",marginBottom:"14px"}}>HCP {selPlayer.user.hcp} · {getCat(selPlayer.user.hcp)}</div>
           <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"14px"}}>
-            {[["vueltas","Vueltas"],["stats","Estadísticas"],["notas","Notas mentales"]].map(([t,l])=>(
+            {[["vueltas","Vueltas"],["stats","Estadísticas"],["notas","Notas y Canchas"]].map(([t,l])=>(
               <button key={t} style={{...S.nb(selPlayerTab===t),flex:1}} onClick={()=>setSelPlayerTab(t)}>{l}</button>
             ))}
           </div>
@@ -650,7 +731,7 @@ function CoachPanel(){
               {(()=>{
                 const notas=selPlayer.user.notas||{};
                 const tieneNotas=Object.values(notas).some(Boolean);
-                if(!tieneNotas) return <div style={{color:"#b09050",fontSize:"13px"}}>Este alumno todavía no cargó notas mentales.</div>;
+                if(!tieneNotas) return <div style={{color:"#b09050",fontSize:"13px",marginBottom:"14px"}}>Este alumno todavía no cargó notas mentales.</div>;
                 return [...ZONES,"Nota general"].map(z=>notas[z]&&(
                   <div key={z} style={{marginBottom:"12px"}}>
                     <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"4px"}}>{z}</div>
@@ -658,6 +739,24 @@ function CoachPanel(){
                   </div>
                 ));
               })()}
+              <div style={{borderTop:"1px solid #5a4a20",marginTop:"14px",paddingTop:"14px"}}>
+                <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Configuraciones de cancha</div>
+                {(()=>{
+                  const configs=lsGet("configs:"+selPlayer.user.username)||{};
+                  const keys=Object.keys(configs);
+                  if(!keys.length) return <div style={{color:"#b09050",fontSize:"13px"}}>Sin configuraciones guardadas.</div>;
+                  return keys.map(k=>{
+                    const cfg=configs[k];
+                    const course=COURSES.find(c=>c.id===cfg.courseId);
+                    return(
+                      <div key={k} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}>
+                        <div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}</div>
+                        <div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
             </div>
           )}
           {selPlayerTab==="vueltas"&&(
