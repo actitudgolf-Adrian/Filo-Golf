@@ -357,7 +357,11 @@ function NewRound({user,onSave,onCancel}){
       const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,numHoles:holeCount,holes,totalShots,totalPutts,totalChips,totalBunker,createdAt:Date.now()};
       lsSet("round:"+id,round);
       const idx=lsGet("rounds:"+user.username)||[];idx.push(id);lsSet("rounds:"+user.username,idx);
-      await sbU("rounds",{id,username:user.username,player_name:user.name,course_id:meta.courseId,course_name:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpt:meta.hcpT,num_holes:holeCount,holes,total_shots:totalShots,total_putts:totalPutts,total_chips:totalChips,total_bunker:totalBunker,created_at:Date.now()});
+      // Mark as pending sync
+      const pending=lsGet("pending:"+user.username)||[];pending.push(id);lsSet("pending:"+user.username,pending);
+      // Try to sync now
+      const ok=await sbU("rounds",{id,username:user.username,player_name:user.name,course_id:meta.courseId,course_name:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpt:meta.hcpT,num_holes:holeCount,holes,total_shots:totalShots,total_putts:totalPutts,total_chips:totalChips,total_bunker:totalBunker,created_at:Date.now()});
+      if(ok){const p=lsGet("pending:"+user.username)||[];lsSet("pending:"+user.username,p.filter(x=>x!==id));}
       onSave();
     }catch(e){setErr("Error al guardar. Intentá de nuevo.");}
     finally{setSaving(false);}
@@ -507,12 +511,36 @@ function MyRounds({user}){
 
   useEffect(()=>{loadRounds();},[]);
 
+  async function syncPending(){
+    const pending=lsGet("pending:"+user.username)||[];
+    if(!pending.length)return;
+    const synced=[];
+    for(const id of pending){
+      const r=lsGet("round:"+id);
+      if(!r)continue;
+      const ok=await sbU("rounds",{id,username:r.username,player_name:r.playerName,course_id:r.courseId,course_name:r.courseName,date:r.date,format:r.format,hcp:r.hcp||0,hcpt:r.hcpT,num_holes:r.numHoles||18,holes:r.holes,total_shots:r.totalShots||0,total_putts:r.totalPutts||0,total_chips:r.totalChips||0,total_bunker:r.totalBunker||0,created_at:r.createdAt||Date.now()});
+      if(ok)synced.push(id);
+    }
+    if(synced.length){
+      const remaining=pending.filter(id=>!synced.includes(id));
+      lsSet("pending:"+user.username,remaining);
+    }
+    return synced.length;
+  }
+
   async function loadRounds(){
     setLoading(true);
+    // First sync any pending local rounds
+    await syncPending();
     try{
       const sb=await sbQ(`rounds?username=eq.${user.username}&order=created_at.desc`);
-      if(sb&&sb.length){setRounds(sb);}
-      else{
+      if(sb&&sb.length){
+        // Also merge any local rounds not yet in Supabase
+        const sbIds=new Set(sb.map(r=>r.id));
+        const localIdx=lsGet("rounds:"+user.username)||[];
+        const localOnly=localIdx.map(id=>lsGet("round:"+id)).filter(r=>r&&!sbIds.has(r.id));
+        setRounds([...sb,...localOnly].sort((a,b)=>(b.created_at||b.createdAt||0)-(a.created_at||a.createdAt||0)));
+      }else{
         const idx=lsGet("rounds:"+user.username)||[];
         const loaded=idx.map(id=>lsGet("round:"+id)).filter(Boolean);
         loaded.sort((a,b)=>b.createdAt-a.createdAt);
@@ -540,6 +568,11 @@ function MyRounds({user}){
         <div style={S.h2}>Mis Vueltas</div>
         <button style={{...S.btn("g"),fontSize:"11px",padding:"7px 12px"}} onClick={loadRounds}>⟳ Actualizar</button>
       </div>
+      {(lsGet("pending:"+user.username)||[]).length>0&&(
+        <div style={{...S.alt("e"),fontSize:"12px"}}>
+          ⚠️ Tenés {(lsGet("pending:"+user.username)||[]).length} vuelta(s) sin sincronizar. Tocá "Actualizar" cuando tengas conexión.
+        </div>
+      )}
       {loading&&<div style={{color:"#b09050",textAlign:"center",padding:"20px"}}>Cargando...</div>}
       {!loading&&rounds.length===0&&(
         <div style={{...S.card,textAlign:"center",color:"#b09050",padding:"40px 20px"}}>
