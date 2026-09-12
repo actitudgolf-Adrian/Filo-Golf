@@ -27,6 +27,14 @@ input[type=number]::-webkit-inner-spin-button{opacity:1}
 const {useState,useEffect}=React;
 const gold="#C9A84C";
 
+const SB_URL="https://qrkxzgwycuvtirlurmec.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFya3h6Z3d5Y3V2dGlybHVybWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNzU2MDksImV4cCI6MjA5OTc1MTYwOX0.B7yIQMSW6u8O7P6IsDaTdqk1IxFU3nSkngVx2lmaSMs";
+const H={"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates"};
+
+async function sbQ(path){try{const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H});if(!r.ok)return[];return await r.json();}catch{return[]}}
+async function sbU(table,data){try{const r=await fetch(SB_URL+"/rest/v1/"+table,{method:"POST",headers:H,body:JSON.stringify(data)});return r.ok;}catch{return false}}
+async function sbD(table,match){try{const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");const r=await fetch(SB_URL+"/rest/v1/"+table+"?"+q,{method:"DELETE",headers:H});return r.ok;}catch{return false}}
+
 function lsGet(k){try{const v=localStorage.getItem("fg_"+k);return v?JSON.parse(v):null}catch{return null}}
 function lsSet(k,v){try{localStorage.setItem("fg_"+k,JSON.stringify(v));return true}catch{return false}}
 
@@ -93,7 +101,7 @@ function StatCard({label,value,sub}){
 }
 
 function calcStats(rounds){
-  if(!rounds.length) return null;
+  if(!rounds.length)return null;
   const n=rounds.length;
   const totalHoles=rounds.reduce((s,r)=>s+Object.keys(r.holes||{}).length,0);
   const avgGross=(rounds.reduce((s,r)=>s+(r.totalShots||0),0)/n).toFixed(1);
@@ -104,17 +112,17 @@ function calcStats(rounds){
   const totalChips=rounds.reduce((s,r)=>s+(r.totalChips||0),0);
   const totalBunker=rounds.reduce((s,r)=>s+(r.totalBunker||0),0);
   const avgPutts=(totalPutts/n).toFixed(1);
-  const avgPuttsHoyo=totalHoles?(totalPutts/totalHoles).toFixed(2):"—";
+  const avgPuttsH=totalHoles?(totalPutts/totalHoles).toFixed(2):"—";
   const avgChips=(totalChips/n).toFixed(1);
-  const avgChipsHoyo=totalHoles?(totalChips/totalHoles).toFixed(2):"—";
+  const avgChipsH=totalHoles?(totalChips/totalHoles).toFixed(2):"—";
   const avgBunker=(totalBunker/n).toFixed(1);
-  const avgBunkerHoyo=totalHoles?(totalBunker/totalHoles).toFixed(2):"—";
-  return{n,avgGross,avgNeto,best,bestNeto,avgPutts,avgPuttsHoyo,avgChips,avgChipsHoyo,avgBunker,avgBunkerHoyo};
+  const avgBunkerH=totalHoles?(totalBunker/totalHoles).toFixed(2):"—";
+  return{n,avgGross,avgNeto,best,bestNeto,avgPutts,avgPuttsH,avgChips,avgChipsH,avgBunker,avgBunkerH};
 }
 
 function StatsView({rounds,hcp,isCoach}){
   const st=calcStats(rounds);
-  if(!st) return <div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>Sin vueltas registradas aún.</div>;
+  if(!st)return <div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>Sin vueltas registradas aún.</div>;
   return(
     <div>
       <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Score</div>
@@ -125,16 +133,16 @@ function StatsView({rounds,hcp,isCoach}){
       <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Putting</div>
       <div style={{...S.g2,marginBottom:"8px"}}>
         <StatCard label="PROM. PUTTS/RONDA" value={st.avgPutts}/>
-        <StatCard label="PROM. PUTTS/HOYO" value={st.avgPuttsHoyo}/>
+        <StatCard label="PROM. PUTTS/HOYO" value={st.avgPuttsH}/>
       </div>
       <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Juego corto</div>
       <div style={{...S.g2,marginBottom:"8px"}}>
         <StatCard label="PROM. CHIPS/RONDA" value={st.avgChips}/>
-        <StatCard label="PROM. CHIPS/HOYO" value={st.avgChipsHoyo}/>
+        <StatCard label="PROM. CHIPS/HOYO" value={st.avgChipsH}/>
       </div>
       <div style={{...S.g2,marginBottom:"8px"}}>
         <StatCard label="PROM. BÚNKER/RONDA" value={st.avgBunker}/>
-        <StatCard label="PROM. BÚNKER/HOYO" value={st.avgBunkerHoyo}/>
+        <StatCard label="PROM. BÚNKER/HOYO" value={st.avgBunkerH}/>
       </div>
       <div style={{...S.card,textAlign:"center",padding:"12px"}}>
         <div style={{color:"#b09050",fontSize:"11px"}}>{st.n} vuelta{st.n!==1?"s":""} · {getCat(hcp)} · HCP {hcp}</div>
@@ -143,34 +151,52 @@ function StatsView({rounds,hcp,isCoach}){
     </div>
   );
 }
+
 function Auth({onLogin}){
   const [mode,setMode]=useState("login");
   const [f,setF]=useState({user:"",pass:"",code:"",name:"",hcp:"18",hcpT:"libre"});
   const [err,setErr]=useState("");
+  const [busy,setBusy]=useState(false);
   const upd=(k,v)=>setF(p=>({...p,[k]:v}));
 
-  function login(){
-    setErr("");
-    const u=f.user.trim().toLowerCase();
-    if(u===COACH_U&&f.pass===COACH_P){const c={username:"coach",name:"Adrián Mamianetti",isCoach:true};lsSet("session",c);onLogin(c);return}
-    const s=lsGet("user:"+u);
-    if(!s){setErr("Usuario no encontrado.");return}
-    if(s.pass!==f.pass){setErr("Contraseña incorrecta.");return}
-    lsSet("session",s);onLogin(s);
+  async function login(){
+    setErr("");setBusy(true);
+    try{
+      const u=f.user.trim().toLowerCase();
+      if(u===COACH_U&&f.pass===COACH_P){
+        const c={username:"coach",name:"Adrián Mamianetti",isCoach:true};
+        lsSet("session",c);onLogin(c);return;
+      }
+      const rows=await sbQ(`users?username=eq.${u}&limit=1`);
+      const sb=rows&&rows[0];
+      const local=lsGet("user:"+u);
+      const s=sb||local;
+      if(!s){setErr("Usuario no encontrado.");return}
+      const pass=lsGet("pass:"+u)||s.pass;
+      if(pass!==f.pass){setErr("Contraseña incorrecta.");return}
+      const ud={username:s.username,name:s.name,hcp:s.hcp||18,hcpT:s.hcpt||s.hcpT||"libre",isCoach:false};
+      lsSet("session",ud);lsSet("pass:"+u,f.pass);onLogin(ud);
+    }catch(e){setErr("Error de conexión.");}
+    finally{setBusy(false);}
   }
 
-  function register(){
-    setErr("");
-    if(f.code.trim().toUpperCase()!==INVITE){setErr("Código de invitación inválido.");return}
-    if(!f.user.trim()||!f.pass||!f.name.trim()){setErr("Completá todos los campos.");return}
-    const u=f.user.trim().toLowerCase().replace(/\s/g,"");
-    if(u===COACH_U){setErr("Ese usuario no está disponible.");return}
-    if(lsGet("user:"+u)){setErr("Ese usuario ya existe, elegí otro.");return}
-    const ud={username:u,pass:f.pass,name:f.name.trim(),hcp:parseFloat(f.hcp)||18,hcpT:f.hcpT,isCoach:false,joinedAt:Date.now()};
-    lsSet("user:"+u,ud);
-    const list=lsGet("userlist")||[];
-    if(!list.includes(u)){list.push(u);lsSet("userlist",list)}
-    lsSet("session",ud);onLogin(ud);
+  async function register(){
+    setErr("");setBusy(true);
+    try{
+      if(f.code.trim().toUpperCase()!==INVITE){setErr("Código de invitación inválido.");return}
+      if(!f.user.trim()||!f.pass||!f.name.trim()){setErr("Completá todos los campos.");return}
+      const u=f.user.trim().toLowerCase().replace(/\s/g,"");
+      if(u===COACH_U){setErr("Ese usuario no está disponible.");return}
+      const exists=await sbQ(`users?username=eq.${u}&limit=1`);
+      if((exists&&exists.length)||lsGet("user:"+u)){setErr("Ese usuario ya existe.");return}
+      const hcp=parseFloat(f.hcp)||18;
+      const ud={username:u,name:f.name.trim(),hcp:hcp,hcpT:f.hcpT,isCoach:false};
+      await sbU("users",{username:u,name:ud.name,hcp:hcp,hcpt:f.hcpT,joined_at:Date.now()});
+      lsSet("user:"+u,{...ud,pass:f.pass});
+      lsSet("pass:"+u,f.pass);
+      lsSet("session",ud);onLogin(ud);
+    }catch(e){setErr("Error inesperado.");}
+    finally{setBusy(false);}
   }
 
   return(
@@ -209,8 +235,8 @@ function Auth({onLogin}){
               </div>
             </div>
           )}
-          <button style={{...S.btn("p"),width:"100%",padding:"12px",fontSize:"14px",marginTop:"4px"}} onClick={mode==="login"?login:register}>
-            {mode==="login"?"Ingresar":"Crear cuenta"}
+          <button style={{...S.btn("p"),width:"100%",padding:"12px",fontSize:"14px",marginTop:"4px"}} onClick={mode==="login"?login:register} disabled={busy}>
+            {busy?"Un momento...":(mode==="login"?"Ingresar":"Crear cuenta")}
           </button>
           {mode==="register"&&<div style={{marginTop:"10px",fontSize:"10px",color:"#b09050",textAlign:"center"}}>El código te lo da tu coach Adrián.</div>}
         </div>
@@ -236,14 +262,8 @@ function HoleCard({hole,data,onChange,readonly}){
         {readonly&&hasNotes&&<span style={{fontSize:"18px"}}>📝</span>}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
-        <div>
-          <label style={S.lbl}>Par</label>
-          <input style={smInp} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/>
-        </div>
-        <div>
-          <label style={S.lbl}>Distancia del hoyo (yds)</label>
-          <input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/>
-        </div>
+        <div><label style={S.lbl}>Par</label><input style={smInp} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/></div>
+        <div><label style={S.lbl}>Distancia del hoyo (yds)</label><input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/></div>
       </div>
       <div style={{marginBottom:"12px"}}>
         <label style={S.lbl}>Golpes</label>
@@ -303,12 +323,7 @@ function HoleCard({hole,data,onChange,readonly}){
       {readonly&&hasNotes&&(
         <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px",marginTop:"10px"}}>
           {d.salida&&<div style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>Salida: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.salida}</span></div>}
-          {ZONES.map(z=>d.zones?.[z]&&(
-            <div key={z} style={{marginBottom:"6px"}}>
-              <span style={{color:"#b09050",fontSize:"11px"}}>{z}: </span>
-              <span style={{color:"#f5ead0",fontSize:"13px"}}>{d.zones[z]}</span>
-            </div>
-          ))}
+          {ZONES.map(z=>d.zones?.[z]&&(<div key={z} style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>{z}: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.zones[z]}</span></div>))}
           {d.note&&<div><span style={{color:"#b09050",fontSize:"11px"}}>Libre: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.note}</span></div>}
         </div>
       )}
@@ -321,6 +336,7 @@ function NewRound({user,onSave,onCancel}){
   const [meta,setMeta]=useState({courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18,savedConfig:""});
   const [holes,setHoles]=useState({});
   const [err,setErr]=useState("");
+  const [saving,setSaving]=useState(false);
   const [savedConfigs,setSavedConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
   const [showSaveCfg,setShowSaveCfg]=useState(false);
   const [cfgName,setCfgName]=useState("");
@@ -331,15 +347,20 @@ function NewRound({user,onSave,onCancel}){
   const totalChips=Object.values(holes).reduce((s,h)=>s+(parseInt(h.chips)||0),0);
   const totalBunker=Object.values(holes).reduce((s,h)=>s+(parseInt(h.bunker)||0),0);
   const hasDist=Object.values(holes).some(h=>h.dist);
+  const configsForCourse=Object.keys(savedConfigs).filter(k=>k.startsWith(meta.courseId+"|"));
 
-  function save(){
+  async function save(){
     if(!meta.courseId){setErr("Seleccioná una cancha.");return}
-    const id=Date.now().toString();
-    const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,numHoles:holeCount,holes,totalShots,totalPutts,totalChips,totalBunker,createdAt:Date.now()};
-    lsSet("round:"+id,round);
-    const idx=lsGet("rounds:"+user.username)||[];
-    idx.push(id);lsSet("rounds:"+user.username,idx);
-    onSave();
+    setSaving(true);
+    try{
+      const id=Date.now().toString();
+      const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,numHoles:holeCount,holes,totalShots,totalPutts,totalChips,totalBunker,createdAt:Date.now()};
+      lsSet("round:"+id,round);
+      const idx=lsGet("rounds:"+user.username)||[];idx.push(id);lsSet("rounds:"+user.username,idx);
+      await sbU("rounds",{id,username:user.username,player_name:user.name,course_id:meta.courseId,course_name:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpt:meta.hcpT,num_holes:holeCount,holes,total_shots:totalShots,total_putts:totalPutts,total_chips:totalChips,total_bunker:totalBunker,created_at:Date.now()});
+      onSave();
+    }catch(e){setErr("Error al guardar. Intentá de nuevo.");}
+    finally{setSaving(false);}
   }
 
   function saveConfig(){
@@ -349,13 +370,9 @@ function NewRound({user,onSave,onCancel}){
     Object.entries(holes).forEach(([h,d])=>{holesOnly[h]={par:d.par,dist:d.dist}});
     const configs=lsGet("configs:"+user.username)||{};
     configs[key]={name:cfgName.trim(),courseId:meta.courseId,holes:holesOnly,savedAt:Date.now()};
-    lsSet("configs:"+user.username,configs);
-    setSavedConfigs(configs);
-    setShowSaveCfg(false);
+    lsSet("configs:"+user.username,configs);setSavedConfigs(configs);setShowSaveCfg(false);
     alert("✓ Configuración guardada: "+cfgName.trim());
   }
-
-  const configsForCourse=Object.keys(savedConfigs).filter(k=>k.startsWith(meta.courseId+"|"));
 
   return(
     <div style={S.page}>
@@ -378,18 +395,13 @@ function NewRound({user,onSave,onCancel}){
               <select style={S.sel} value={meta.savedConfig||""} onChange={e=>{
                 const cfg=savedConfigs[e.target.value];
                 if(cfg){
-                  const newHoles={};
-                  Object.entries(cfg.holes||{}).forEach(([h,d])=>{newHoles[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
-                  setHoles(newHoles);
-                  setMeta(m=>({...m,savedConfig:e.target.value,numHoles:Object.keys(cfg.holes||{}).length}));
-                } else {
-                  setMeta(m=>({...m,savedConfig:""}));
-                }
+                  const newH={};
+                  Object.entries(cfg.holes||{}).forEach(([h,d])=>{newH[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
+                  setHoles(newH);setMeta(m=>({...m,savedConfig:e.target.value,numHoles:Object.keys(cfg.holes||{}).length}));
+                }else{setMeta(m=>({...m,savedConfig:""}));}
               }}>
                 <option value="">Sin configuración guardada</option>
-                {configsForCourse.map(k=>(
-                  <option key={k} value={k}>{savedConfigs[k].name}</option>
-                ))}
+                {configsForCourse.map(k=><option key={k} value={k}>{savedConfigs[k].name}</option>)}
               </select>
             </div>
           )}
@@ -453,34 +465,35 @@ function NewRound({user,onSave,onCancel}){
           )}
           <div style={{display:"flex",gap:"8px",marginTop:"12px"}}>
             <button style={S.btn("g")} onClick={()=>setStep(1)}>← Atrás</button>
-            <button style={{...S.btn("p"),flex:1,padding:"11px"}} onClick={save}>Guardar vuelta ✓</button>
+            <button style={{...S.btn("p"),flex:1,padding:"11px"}} onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar vuelta ✓"}</button>
           </div>
         </div>
       )}
     </div>
   );
 }
+
 function RoundDetail({round,onBack,coachView}){
   const course=COURSES.find(c=>c.id===round.courseId);
-  const count=round.numHoles||course?.holes||Object.keys(round.holes||{}).length||18;
+  const count=round.numHoles||round.num_holes||course?.holes||Object.keys(round.holes||{}).length||18;
   return(
     <div style={S.page}>
       <button style={{...S.btn("g"),marginBottom:"12px"}} onClick={onBack}>← Volver</button>
       <div style={S.card}>
         <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"8px",marginBottom:"12px"}}>
           <div>
-            <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{round.courseName}</div>
+            <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{round.courseName||round.course_name}</div>
             <div style={{color:"#b09050",fontSize:"11px"}}>{round.date} · {round.format} · {count} hoyos</div>
-            {coachView&&<div style={{color:"#b09050",fontSize:"11px"}}>Jugador: <span style={{color:"#f5ead0"}}>{round.playerName}</span></div>}
+            {coachView&&<div style={{color:"#b09050",fontSize:"11px"}}>Jugador: <span style={{color:"#f5ead0"}}>{round.playerName||round.player_name}</span></div>}
           </div>
           <div style={{textAlign:"right"}}>
-            <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{round.totalShots}</div>
-            <div style={{color:"#b09050",fontSize:"11px"}}>{round.totalPutts} putts · {round.totalChips||0} chips · {round.totalBunker||0} búnker</div>
-            <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {(round.totalShots||0)-(round.hcp||0)}</div>
+            <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{round.totalShots||round.total_shots}</div>
+            <div style={{color:"#b09050",fontSize:"11px"}}>{round.totalPutts||round.total_putts} putts · {round.totalChips||round.total_chips||0} chips · {round.totalBunker||round.total_bunker||0} búnker</div>
+            <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {(round.totalShots||round.total_shots||0)-(round.hcp||0)}</div>
           </div>
         </div>
         {Array.from({length:count},(_,i)=>i+1).map(h=>(
-          <HoleCard key={h} hole={h} data={round.holes?.[h]||{}} onChange={()=>{}} readonly/>
+          <HoleCard key={h} hole={h} data={round.holes?.[h]||round.holes?.[String(h)]||{}} onChange={()=>{}} readonly/>
         ))}
       </div>
     </div>
@@ -490,35 +503,45 @@ function RoundDetail({round,onBack,coachView}){
 function MyRounds({user}){
   const [rounds,setRounds]=useState([]);
   const [selected,setSelected]=useState(null);
+  const [loading,setLoading]=useState(true);
 
-  useEffect(()=>{
-    const idx=lsGet("rounds:"+user.username)||[];
-    const loaded=idx.map(id=>lsGet("round:"+id)).filter(Boolean);
-    loaded.sort((a,b)=>b.createdAt-a.createdAt);
-    setRounds(loaded);
-  },[]);
+  useEffect(()=>{loadRounds();},[]);
 
-  function exportData(){
-    const ud=lsGet("user:"+user.username);
-    const rs=(lsGet("rounds:"+user.username)||[]).map(id=>lsGet("round:"+id)).filter(Boolean);
-    return btoa(unescape(encodeURIComponent(JSON.stringify({user:ud,rounds:rs,exportedAt:Date.now()}))));
-  }
-
-  function sendWhatsApp(){
-    const code=exportData();
-    const msg=encodeURIComponent("FiloGolf-datos:\n"+code);
-    window.open("https://wa.me/5491140462719?text="+msg,"_blank");
+  async function loadRounds(){
+    setLoading(true);
+    try{
+      const sb=await sbQ(`rounds?username=eq.${user.username}&order=created_at.desc`);
+      if(sb&&sb.length){setRounds(sb);}
+      else{
+        const idx=lsGet("rounds:"+user.username)||[];
+        const loaded=idx.map(id=>lsGet("round:"+id)).filter(Boolean);
+        loaded.sort((a,b)=>b.createdAt-a.createdAt);
+        setRounds(loaded);
+      }
+    }catch{
+      const idx=lsGet("rounds:"+user.username)||[];
+      setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
+    }
+    setLoading(false);
   }
 
   if(selected)return <RoundDetail round={selected} onBack={()=>setSelected(null)}/>;
+
+  const getShots=r=>r.totalShots||r.total_shots||0;
+  const getPutts=r=>r.totalPutts||r.total_putts||0;
+  const getChips=r=>r.totalChips||r.total_chips||0;
+  const getHcp=r=>r.hcp||0;
+  const getHoles=r=>r.numHoles||r.num_holes||18;
+  const getName=r=>r.courseName||r.course_name||"";
 
   return(
     <div style={S.page}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
         <div style={S.h2}>Mis Vueltas</div>
-        <button style={{...S.btn("p"),fontSize:"11px",padding:"7px 12px"}} onClick={sendWhatsApp}>📲 Enviar al coach</button>
+        <button style={{...S.btn("g"),fontSize:"11px",padding:"7px 12px"}} onClick={loadRounds}>⟳ Actualizar</button>
       </div>
-      {rounds.length===0&&(
+      {loading&&<div style={{color:"#b09050",textAlign:"center",padding:"20px"}}>Cargando...</div>}
+      {!loading&&rounds.length===0&&(
         <div style={{...S.card,textAlign:"center",color:"#b09050",padding:"40px 20px"}}>
           <div style={{fontSize:"32px",marginBottom:"10px"}}>⛳</div>
           <div>Todavía no registraste ninguna vuelta.</div>
@@ -528,14 +551,14 @@ function MyRounds({user}){
         <div key={r.id} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelected(r)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
             <div>
-              <div style={{color:"#f5ead0",fontWeight:"bold",marginBottom:"3px"}}>{r.courseName}</div>
-              <div style={{color:"#b09050",fontSize:"11px"}}>{r.date} · {r.format} · {r.numHoles||18} hoyos</div>
-              <div style={{color:"#b09050",fontSize:"11px"}}>HCP {r.hcp} ({r.hcpT})</div>
+              <div style={{color:"#f5ead0",fontWeight:"bold",marginBottom:"3px"}}>{getName(r)}</div>
+              <div style={{color:"#b09050",fontSize:"11px"}}>{r.date} · {r.format} · {getHoles(r)} hoyos</div>
+              <div style={{color:"#b09050",fontSize:"11px"}}>HCP {getHcp(r)} ({r.hcpT||r.hcpt||"libre"})</div>
             </div>
             <div style={{textAlign:"right"}}>
-              <div style={{color:gold,fontSize:"22px",fontWeight:"bold"}}>{r.totalShots}</div>
-              <div style={{color:"#b09050",fontSize:"11px"}}>{r.totalPutts} putts · {r.totalChips||0} chips</div>
-              <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
+              <div style={{color:gold,fontSize:"22px",fontWeight:"bold"}}>{getShots(r)}</div>
+              <div style={{color:"#b09050",fontSize:"11px"}}>{getPutts(r)} putts · {getChips(r)} chips</div>
+              <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {getShots(r)-getHcp(r)}</div>
             </div>
           </div>
         </div>
@@ -547,8 +570,20 @@ function MyRounds({user}){
 function Stats({user}){
   const [rounds,setRounds]=useState([]);
   useEffect(()=>{
-    const idx=lsGet("rounds:"+user.username)||[];
-    setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
+    (async()=>{
+      try{
+        const sb=await sbQ(`rounds?username=eq.${user.username}`);
+        if(sb&&sb.length){
+          setRounds(sb.map(r=>({id:r.id,totalShots:r.total_shots||0,totalPutts:r.total_putts||0,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,hcp:r.hcp||0,holes:r.holes||{}})));
+        }else{
+          const idx=lsGet("rounds:"+user.username)||[];
+          setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
+        }
+      }catch{
+        const idx=lsGet("rounds:"+user.username)||[];
+        setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
+      }
+    })();
   },[]);
   return(
     <div style={S.page}>
@@ -564,20 +599,16 @@ function Profile({user,onUpdate}){
   const [configs,setConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
   const [msg,setMsg]=useState("");
 
-  function save(){
+  async function save(){
     const u={...user,hcp:parseFloat(f.hcp)||0,hcpT:f.hcpT};
-    lsSet("user:"+user.username,u);
-    lsSet("session",u);
-    lsSet("notas:"+user.username,notas);
-    onUpdate(u);
-    setMsg("✓ Perfil actualizado.");
+    lsSet("user:"+user.username,u);lsSet("session",u);lsSet("notas:"+user.username,notas);
+    await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,joined_at:user.joinedAt||Date.now()});
+    onUpdate(u);setMsg("✓ Perfil actualizado.");
   }
 
   function deleteConfig(key){
     const c=lsGet("configs:"+user.username)||{};
-    delete c[key];
-    lsSet("configs:"+user.username,c);
-    setConfigs({...c});
+    delete c[key];lsSet("configs:"+user.username,c);setConfigs({...c});
   }
 
   return(
@@ -627,33 +658,45 @@ function Profile({user,onUpdate}){
     </div>
   );
 }
+
 function CoachPanel(){
   const [tab,setTab]=useState("ranking");
-  const [players,setPlayers]=useState(()=>lsGet("coach:players")||[]);
+  const [players,setPlayers]=useState([]);
   const [selPlayer,setSelPlayer]=useState(null);
   const [selRound,setSelRound]=useState(null);
   const [selPlayerTab,setSelPlayerTab]=useState("vueltas");
-  const [code,setCode]=useState("");
-  const [msg,setMsg]=useState("");
+  const [loading,setLoading]=useState(false);
 
-  function importPlayer(){
-    setMsg("");
+  useEffect(()=>{loadAll();},[]);
+
+  async function loadAll(){
+    setLoading(true);
     try{
-      const raw=decodeURIComponent(escape(atob(code.trim())));
-      const pkg=JSON.parse(raw);
-      if(!pkg.user||!pkg.rounds){setMsg("Código inválido.");return}
-      const updated=[...players.filter(p=>p.user.username!==pkg.user.username),pkg];
-      lsSet("coach:players",updated);setPlayers(updated);setCode("");
-      setMsg("✓ "+pkg.user.name+" importado. "+pkg.rounds.length+" vuelta(s).");
-    }catch(e){setMsg("Error al leer el código.")}
+      const sbRounds=await sbQ("rounds?order=created_at.desc");
+      const sbUsers=await sbQ("users");
+      const userMap={};
+      (sbUsers||[]).forEach(u=>{userMap[u.username]={username:u.username,name:u.name,hcp:u.hcp||18,hcpT:u.hcpt||"libre",notas:u.notas||{}}});
+      const byPlayer={};
+      (sbRounds||[]).forEach(r=>{
+        if(!byPlayer[r.username])byPlayer[r.username]={user:userMap[r.username]||{username:r.username,name:r.player_name,hcp:r.hcp||18},rounds:[]};
+        byPlayer[r.username].rounds.push(r);
+      });
+      const result=Object.values(byPlayer);
+      setPlayers(result.length?result:lsGet("coach:players")||[]);
+    }catch{setPlayers(lsGet("coach:players")||[]);}
+    finally{setLoading(false);}
   }
 
-  function allRounds(){return players.flatMap(p=>p.rounds).sort((a,b)=>b.createdAt-a.createdAt)}
+  function allRounds(){return players.flatMap(p=>p.rounds).sort((a,b)=>(b.created_at||b.createdAt||0)-(a.created_at||a.createdAt||0))}
 
   function ranking(){
     const pl={};
-    players.forEach(pkg=>{const u=pkg.user;if(!u)return;pl[u.username]={name:u.name,hcp:u.hcp,rounds:pkg.rounds,shots:pkg.rounds.reduce((s,r)=>s+(r.totalShots||0),0)}});
-    return Object.values(pl).sort((a,b)=>(a.shots/a.rounds.length)-(b.shots/b.rounds.length));
+    players.forEach(pkg=>{
+      const u=pkg.user;if(!u)return;
+      const shots=pkg.rounds.reduce((s,r)=>s+(r.total_shots||r.totalShots||0),0);
+      pl[u.username]={name:u.name,hcp:u.hcp,rounds:pkg.rounds,shots};
+    });
+    return Object.values(pl).filter(p=>p.rounds.length).sort((a,b)=>(a.shots/a.rounds.length)-(b.shots/b.rounds.length));
   }
 
   if(selRound)return <RoundDetail round={selRound} onBack={()=>setSelRound(null)} coachView/>;
@@ -661,21 +704,25 @@ function CoachPanel(){
 
   return(
     <div style={S.page}>
-      <div style={S.h2}>Panel Coach</div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
+        <div style={S.h2}>Panel Coach</div>
+        <button style={{...S.btn("g"),fontSize:"11px",padding:"6px 10px"}} onClick={loadAll}>{loading?"⟳...":"⟳ Actualizar"}</button>
+      </div>
       <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"16px"}}>
-        {[["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"],["import","Importar"]].map(([t,l])=>(
+        {[["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"]].map(([t,l])=>(
           <button key={t} style={S.nb(tab===t)} onClick={()=>{setTab(t);setSelPlayer(null);setSelPlayerTab("vueltas")}}>{l}</button>
         ))}
       </div>
+      {loading&&<div style={{color:"#b09050",padding:"20px",textAlign:"center"}}>Cargando datos...</div>}
 
-      {tab==="ranking"&&(
+      {tab==="ranking"&&!loading&&(
         rank.length===0
-          ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>Importá datos de alumnos para ver el ranking.</div>
+          ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay datos aún.</div>
           :rank.map((p,i)=>{
             const avgGross=(p.shots/p.rounds.length).toFixed(1);
-            const netoShots=p.rounds.reduce((s,r)=>s+((r.totalShots||0)-(r.hcp||0)),0);
+            const netoShots=p.rounds.reduce((s,r)=>s+((r.total_shots||r.totalShots||0)-(r.hcp||0)),0);
             const avgNeto=(netoShots/p.rounds.length).toFixed(1);
-            const best=Math.min(...p.rounds.map(r=>r.totalShots||999));
+            const best=Math.min(...p.rounds.map(r=>r.total_shots||r.totalShots||999));
             const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
             return(
               <div key={p.name} style={{...S.card,display:"flex",alignItems:"center",gap:"12px",padding:"12px 14px"}}>
@@ -694,12 +741,12 @@ function CoachPanel(){
           })
       )}
 
-      {tab==="players"&&!selPlayer&&(
+      {tab==="players"&&!loading&&!selPlayer&&(
         players.length===0
-          ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>Todavía no importaste ningún alumno.</div>
+          ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay alumnos aún.</div>
           :players.map(pkg=>{
             const p=pkg.user,rs=pkg.rounds;
-            const avg=rs.length?(rs.reduce((s,r)=>s+(r.totalShots||0),0)/rs.length).toFixed(1):"—";
+            const avg=rs.length?(rs.reduce((s,r)=>s+(r.total_shots||r.totalShots||0),0)/rs.length).toFixed(1):"—";
             return(
               <div key={p.username} style={{...S.card,cursor:"pointer"}} onClick={()=>{setSelPlayer(pkg);setSelPlayerTab("vueltas")}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -724,14 +771,17 @@ function CoachPanel(){
               <button key={t} style={{...S.nb(selPlayerTab===t),flex:1}} onClick={()=>setSelPlayerTab(t)}>{l}</button>
             ))}
           </div>
-          {selPlayerTab==="stats"&&<StatsView rounds={selPlayer.rounds} hcp={selPlayer.user.hcp} isCoach={true}/>}
+          {selPlayerTab==="stats"&&(()=>{
+            const rounds=selPlayer.rounds.map(r=>({id:r.id,totalShots:r.total_shots||r.totalShots||0,totalPutts:r.total_putts||r.totalPutts||0,totalChips:r.total_chips||r.totalChips||0,totalBunker:r.total_bunker||r.totalBunker||0,hcp:r.hcp||0,holes:r.holes||{}}));
+            return <StatsView rounds={rounds} hcp={selPlayer.user.hcp} isCoach={true}/>;
+          })()}
           {selPlayerTab==="notas"&&(
             <div style={S.card}>
               <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Notas mentales</div>
               {(()=>{
                 const notas=selPlayer.user.notas||{};
                 const tieneNotas=Object.values(notas).some(Boolean);
-                if(!tieneNotas) return <div style={{color:"#b09050",fontSize:"13px",marginBottom:"14px"}}>Este alumno todavía no cargó notas mentales.</div>;
+                if(!tieneNotas)return <div style={{color:"#b09050",fontSize:"13px",marginBottom:"14px"}}>Sin notas mentales cargadas.</div>;
                 return [...ZONES,"Nota general"].map(z=>notas[z]&&(
                   <div key={z} style={{marginBottom:"12px"}}>
                     <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"4px"}}>{z}</div>
@@ -742,18 +792,12 @@ function CoachPanel(){
               <div style={{borderTop:"1px solid #5a4a20",marginTop:"14px",paddingTop:"14px"}}>
                 <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Configuraciones de cancha</div>
                 {(()=>{
-                  const configs=lsGet("configs:"+selPlayer.user.username)||{};
-                  const keys=Object.keys(configs);
-                  if(!keys.length) return <div style={{color:"#b09050",fontSize:"13px"}}>Sin configuraciones guardadas.</div>;
+                  const cfgs=lsGet("configs:"+selPlayer.user.username)||{};
+                  const keys=Object.keys(cfgs);
+                  if(!keys.length)return <div style={{color:"#b09050",fontSize:"13px"}}>Sin configuraciones guardadas.</div>;
                   return keys.map(k=>{
-                    const cfg=configs[k];
-                    const course=COURSES.find(c=>c.id===cfg.courseId);
-                    return(
-                      <div key={k} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}>
-                        <div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}</div>
-                        <div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div>
-                      </div>
-                    );
+                    const cfg=cfgs[k];const course=COURSES.find(c=>c.id===cfg.courseId);
+                    return(<div key={k} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}><div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}</div><div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div></div>);
                   });
                 })()}
               </div>
@@ -765,12 +809,12 @@ function CoachPanel(){
               {selPlayer.rounds.map(r=>(
                 <div key={r.id} style={{cursor:"pointer",padding:"9px 0",borderBottom:"1px solid #3a3020",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setSelRound(r)}>
                   <div>
-                    <div style={{color:"#f5ead0",fontSize:"13px"}}>{r.courseName}</div>
-                    <div style={{color:"#b09050",fontSize:"10px"}}>{r.date} · {r.format} · {r.numHoles||18} hoyos</div>
+                    <div style={{color:"#f5ead0",fontSize:"13px"}}>{r.course_name||r.courseName}</div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>{r.date} · {r.format} · {r.num_holes||r.numHoles||18} hoyos</div>
                   </div>
                   <div style={{textAlign:"right"}}>
-                    <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.totalShots}</div>
-                    <div style={{color:"#b09050",fontSize:"10px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
+                    <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.total_shots||r.totalShots}</div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>Neto: {(r.total_shots||r.totalShots||0)-(r.hcp||0)}</div>
                   </div>
                 </div>
               ))}
@@ -779,34 +823,23 @@ function CoachPanel(){
         </>
       )}
 
-      {tab==="rounds"&&(
+      {tab==="rounds"&&!loading&&(
         allRounds().length===0
           ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay vueltas aún.</div>
           :allRounds().map(r=>(
             <div key={r.id} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelRound(r)}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div>
-                  <div style={{color:"#f5ead0",fontWeight:"bold"}}>{r.playerName}</div>
-                  <div style={{color:"#b09050",fontSize:"11px"}}>{r.courseName} · {r.date} · {r.numHoles||18} hoyos</div>
+                  <div style={{color:"#f5ead0",fontWeight:"bold"}}>{r.player_name||r.playerName}</div>
+                  <div style={{color:"#b09050",fontSize:"11px"}}>{r.course_name||r.courseName} · {r.date} · {r.num_holes||r.numHoles||18} hoyos</div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{r.totalShots}</div>
-                  <div style={{color:"#b09050",fontSize:"10px"}}>Neto: {(r.totalShots||0)-(r.hcp||0)}</div>
+                  <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{r.total_shots||r.totalShots}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>Neto: {(r.total_shots||r.totalShots||0)-(r.hcp||0)}</div>
                 </div>
               </div>
             </div>
           ))
-      )}
-
-      {tab==="import"&&(
-        <div style={S.card}>
-          <div style={S.h2}>Importar datos de alumno</div>
-          <div style={{fontSize:"12px",color:"#b09050",marginBottom:"12px"}}>Pedile al alumno que vaya a "Mis Vueltas" → "Enviar al coach", que copie el código y te lo mande por WhatsApp.</div>
-          {msg&&<div style={S.alt(msg.includes("✓")?"s":"e")}>{msg}</div>}
-          <label style={S.lbl}>Código del alumno</label>
-          <textarea style={{...S.inp,minHeight:"80px",resize:"vertical",fontSize:"11px",wordBreak:"break-all",marginBottom:"10px"}} placeholder="Pegá el código acá..." value={code} onChange={e=>setCode(e.target.value)}/>
-          <button style={{...S.btn("p"),width:"100%",padding:"11px"}} onClick={importPlayer}>Importar datos</button>
-        </div>
       )}
     </div>
   );
