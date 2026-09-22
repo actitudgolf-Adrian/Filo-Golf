@@ -67,6 +67,7 @@ const COURSES=[
   {id:"carilo",name:"Cariló Golf Club",holes:18,par:70,city:"Cariló"},
   {id:"santateresita",name:"Santa Teresita Golf",holes:9,par:36,city:"Santa Teresita"},
   {id:"montermos",name:"Montermos Golf Club",holes:18,par:72,city:"Monte Hermoso"},
+  {id:"fincassanvicente",name:"Fincas de San Vicente",holes:18,par:72,city:"San Vicente"},
 ];
 
 const FORMATS_ALL=["Strokeplay","Stableford","Match Play","Fourball","Foursome","Mulligan","Stableford Neto por Hoyo","Fourball Match Play"];
@@ -147,7 +148,118 @@ function StatsView({rounds,hcp,isCoach}){
       <div style={{...S.card,textAlign:"center",padding:"12px"}}>
         <div style={{color:"#b09050",fontSize:"11px"}}>{st.n} vuelta{st.n!==1?"s":""} · {getCat(hcp)} · HCP {hcp}</div>
       </div>
+      <GreenStats rounds={rounds}/>
       {!isCoach&&<div style={{fontSize:"11px",color:"#b09050",textAlign:"center",padding:"10px",background:"#1c1810",borderRadius:"4px"}}>El ranking general lo ve tu coach Adrián.</div>}
+    </div>
+  );
+}
+
+const RANGOS=[{l:"hasta 50",min:0,max:50},{l:"51-80",min:51,max:80},{l:"81-110",min:81,max:110},{l:"111-135",min:111,max:135},{l:"136-150",min:136,max:150},{l:"151-165",min:151,max:165},{l:"166-180",min:166,max:180},{l:"181-195",min:181,max:195},{l:"196-210",min:196,max:210},{l:"211+",min:211,max:9999}];
+
+function GreenStats({rounds}){
+  const [filtMin,setFiltMin]=useState("");
+  const [filtMax,setFiltMax]=useState("");
+
+  // Collect all shots with yards data
+  const shots=[];
+  rounds.forEach(r=>{
+    Object.values(r.holes||{}).forEach(h=>{
+      const yds=parseInt(h.yards||h.dist);
+      if(!yds)return;
+      shots.push({
+        yds,
+        palo:(h.palo||"").trim().toUpperCase()||"—",
+        putts:parseInt(h.putts)||0,
+        chips:parseInt(h.chips)||0,
+        bunker:parseInt(h.bunker)||0,
+        enGreen:(parseInt(h.putts)||0)>0&&(parseInt(h.chips)||0)===0&&(parseInt(h.bunker)||0)===0
+      });
+    });
+  });
+
+  if(!shots.length)return null;
+
+  const avgDist=(shots.reduce((s,h)=>s+h.yds,0)/shots.length).toFixed(0);
+
+  // Filter
+  const fMin=filtMin?parseInt(filtMin):null;
+  const fMax=filtMax?parseInt(filtMax):null;
+  const filtered=shots.filter(s=>(fMin===null||s.yds>=fMin)&&(fMax===null||s.yds<=fMax));
+
+  // By range
+  function rangeStats(min,max){
+    const rs=shots.filter(s=>s.yds>=min&&s.yds<=max);
+    if(!rs.length)return null;
+    const greens=rs.filter(s=>s.enGreen).length;
+    const palos={};
+    rs.forEach(s=>{if(s.palo!=="—"){palos[s.palo]=(palos[s.palo]||0)+1;}});
+    const topPalo=Object.entries(palos).sort((a,b)=>b[1]-a[1])[0];
+    return{n:rs.length,pct:Math.round(greens/rs.length*100),topPalo:topPalo?topPalo[0]:null};
+  }
+
+  // Filtered stats
+  const fGreens=filtered.length?filtered.filter(s=>s.enGreen).length:0;
+  const fPalos={};
+  filtered.forEach(s=>{if(s.palo!=="—")fPalos[s.palo]=(fPalos[s.palo]||0)+1;});
+  const fTopPalos=Object.entries(fPalos).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  return(
+    <div>
+      <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Tiro al green</div>
+      <div style={{...S.card,textAlign:"center",padding:"14px",marginBottom:"8px"}}>
+        <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROMEDIO DISTANCIA DE ATAQUE</div>
+        <div style={{color:gold,fontSize:"34px",fontWeight:"bold"}}>{avgDist} <span style={{fontSize:"16px"}}>yds</span></div>
+        <div style={{color:"#b09050",fontSize:"11px",marginTop:"4px"}}>sobre {shots.length} tiro{shots.length!==1?"s":""} registrado{shots.length!==1?"s":""}</div>
+      </div>
+
+      <div style={{...S.card,marginBottom:"8px"}}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Por rango de distancia</div>
+        {RANGOS.map(rng=>{
+          const rs=rangeStats(rng.min,rng.max);
+          if(!rs)return null;
+          return(
+            <div key={rng.l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #3a3020"}}>
+              <div>
+                <div style={{color:"#f5ead0",fontSize:"13px"}}>{rng.l} yds</div>
+                {rs.topPalo&&<div style={{color:"#b09050",fontSize:"10px"}}>palo más usado: {rs.topPalo}</div>}
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{color:gold,fontSize:"16px",fontWeight:"bold"}}>{rs.pct}%</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>{rs.n} tiro{rs.n!==1?"s":""} · greens</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={S.card}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Filtro libre</div>
+        <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"10px"}}>
+          <input style={{...S.inp,textAlign:"center"}} type="number" placeholder="desde" value={filtMin} onChange={e=>setFiltMin(e.target.value)}/>
+          <span style={{color:"#b09050"}}>—</span>
+          <input style={{...S.inp,textAlign:"center"}} type="number" placeholder="hasta" value={filtMax} onChange={e=>setFiltMax(e.target.value)}/>
+          <span style={{color:"#b09050",fontSize:"11px",whiteSpace:"nowrap"}}>yds</span>
+        </div>
+        {filtered.length>0?(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
+              <div style={{color:"#b09050",fontSize:"12px"}}>{filtered.length} tiro{filtered.length!==1?"s":""}</div>
+              <div style={{color:gold,fontSize:"16px",fontWeight:"bold"}}>{Math.round(fGreens/filtered.length*100)}% greens</div>
+            </div>
+            {fTopPalos.length>0&&(
+              <div>
+                <div style={{color:"#b09050",fontSize:"10px",marginBottom:"6px"}}>Palos más usados en este rango:</div>
+                {fTopPalos.map(([palo,cnt])=>(
+                  <div key={palo} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #3a3020"}}>
+                    <span style={{color:"#f5ead0",fontSize:"13px"}}>{palo}</span>
+                    <span style={{color:"#b09050",fontSize:"12px"}}>{cnt} vez{cnt!==1?"es":""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ):<div style={{color:"#b09050",fontSize:"12px"}}>Ingresá un rango para filtrar.</div>}
+      </div>
     </div>
   );
 }
@@ -297,9 +409,15 @@ function HoleCard({hole,data,onChange,readonly}){
           </div>
         </div>
       </div>
-      <div style={{marginBottom:"10px"}}>
-        <label style={S.lbl}>Dist. tiro a green (yds)</label>
-        <input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"10px"}}>
+        <div>
+          <label style={S.lbl}>Dist. tiro a green (yds)</label>
+          <input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
+        </div>
+        <div>
+          <label style={S.lbl}>Palo escogido</label>
+          <input style={smInp} type="text" placeholder="7H, PW..." value={d.palo||""} disabled={readonly} onChange={e=>upd("palo",e.target.value)}/>
+        </div>
       </div>
       {open&&!readonly&&(
         <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"14px",marginTop:"10px"}}>
