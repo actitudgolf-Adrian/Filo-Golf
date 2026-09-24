@@ -49,7 +49,6 @@ const COURSES=[
   {id:"lomas",name:"Lomas Athletic Club",holes:18,par:72,city:"Lomas de Zamora"},
   {id:"hindu",name:"Club Hindú",holes:18,par:72,city:"Don Torcuato"},
   {id:"cabezacaballo",name:"Cabeza de Caballo",holes:18,par:72,city:"Ezeiza"},
-  {id:"clublomas",name:"Club Lomas",holes:18,par:72,city:"Ezeiza"},
   {id:"canuelas",name:"Las Cañuelas Club de Campo",holes:18,par:72,city:"Las Cañuelas"},
   {id:"lobos",name:"Lobos Golf Club",holes:18,par:72,city:"Lobos"},
   {id:"elsosiego",name:"El Sosiego",holes:18,par:72,city:"Canning"},
@@ -230,6 +229,77 @@ function GreenStats({rounds}){
             </div>
           );
         })}
+      </div>
+
+      <div style={S.card}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Por palo</div>
+        {(()=>{
+          // Agrupar tiros por palo
+          const paloMap={};
+          shots.forEach(s=>{
+            if(s.palo==="—")return;
+            if(!paloMap[s.palo])paloMap[s.palo]={tiros:[],greens:0,chips:0,bunkers:0};
+            paloMap[s.palo].tiros.push(s.yds);
+            if(s.enGreen)paloMap[s.palo].greens++;
+            if(s.chips>0)paloMap[s.palo].chips++;
+            if(s.bunker>0)paloMap[s.palo].bunkers++;
+          });
+          const palosOrdenados=Object.entries(paloMap).sort((a,b)=>{
+            const avgA=a[1].tiros.reduce((x,y)=>x+y,0)/a[1].tiros.length;
+            const avgB=b[1].tiros.reduce((x,y)=>x+y,0)/b[1].tiros.length;
+            return avgA-avgB;
+          });
+          if(!palosOrdenados.length)return <div style={{color:"#b09050",fontSize:"12px"}}>Sin datos de palo registrados aún.</div>;
+          return(
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 60px 70px 44px 36px 36px",gap:"4px",marginBottom:"6px",paddingBottom:"5px",borderBottom:"1px solid #5a4a20"}}>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase"}}>PALO</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>YDS</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>RANGO</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>GRN%</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>CHI</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>BNK</div>
+              </div>
+              {palosOrdenados.map(([palo,d])=>{
+                const n=d.tiros.length;
+                const avg=Math.round(d.tiros.reduce((x,y)=>x+y,0)/n);
+                const mn=Math.min(...d.tiros);
+                const mx=Math.max(...d.tiros);
+                const pctG=Math.round(d.greens/n*100);
+                const pctC=Math.round(d.chips/n*100);
+                const pctB=Math.round(d.bunkers/n*100);
+                return(
+                  <div key={palo} style={{display:"grid",gridTemplateColumns:"1fr 60px 70px 44px 36px 36px",gap:"4px",padding:"7px 0",borderBottom:"1px solid #3a3020",alignItems:"center"}}>
+                    <div>
+                      <div style={{color:"#f5ead0",fontSize:"13px",fontWeight:"bold"}}>{palo}</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>{n} tiro{n!==1?"s":""}</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{avg}</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>prom</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:"#f5ead0",fontSize:"11px"}}>{mn===mx?mn:mn+"–"+mx}</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>yds</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:pctG>=50?"#8e8":pctG>=30?"#aa8":gold,fontSize:"14px",fontWeight:"bold"}}>{pctG}%</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>grn</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:"#f5ead0",fontSize:"13px"}}>{pctC}%</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>chi</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:"#f5ead0",fontSize:"13px"}}>{pctB}%</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>bnk</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       <div style={S.card}>
