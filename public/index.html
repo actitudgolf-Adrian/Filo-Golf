@@ -231,6 +231,65 @@ function GreenStats({rounds}){
         })}
       </div>
 
+      <div style={{...S.card,marginBottom:"8px"}}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Golpes para terminar el hoyo</div>
+        <div style={{color:"#b09050",fontSize:"10px",marginBottom:"10px"}}>Tiro al green + chips + búnker + putts</div>
+        {(()=>{
+          const costoMap={};
+          rounds.forEach(r=>{
+            Object.values(r.holes||{}).forEach(h=>{
+              const yds=parseInt(h.yards||h.dist);
+              if(!yds)return;
+              const putts=parseInt(h.putts)||0;
+              const chips=parseInt(h.chips)||0;
+              const bunker=parseInt(h.bunker)||0;
+              if(putts===0)return; // sin putts no sabemos si terminó
+              const costo=1+chips+bunker+putts;
+              const rng=RANGOS.find(r=>yds>=r.min&&yds<=r.max);
+              if(!rng)return;
+              if(!costoMap[rng.l])costoMap[rng.l]={total:0,n:0,dist:{1:0,2:0,3:0,4:0,5:0,6:0}};
+              costoMap[rng.l].total+=costo;
+              costoMap[rng.l].n++;
+              const k=Math.min(costo,6);
+              costoMap[rng.l].dist[k]=(costoMap[rng.l].dist[k]||0)+1;
+            });
+          });
+          const rangosConDatos=RANGOS.filter(r=>costoMap[r.l]);
+          if(!rangosConDatos.length)return <div style={{color:"#b09050",fontSize:"12px"}}>Sin datos suficientes aún.</div>;
+          return rangosConDatos.map(rng=>{
+            const d=costoMap[rng.l];
+            const avg=(d.total/d.n).toFixed(1);
+            const avgNum=parseFloat(avg);
+            const colorAvg=avgNum<=3?"#8e8":avgNum<=4?"#C9A84C":"#e88";
+            return(
+              <div key={rng.l} style={{padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
+                  <div style={{color:"#f5ead0",fontSize:"13px"}}>{rng.l} yds</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:"5px"}}>
+                    <span style={{color:colorAvg,fontSize:"20px",fontWeight:"bold"}}>{avg}</span>
+                    <span style={{color:"#b09050",fontSize:"10px"}}>golpes prom · {d.n} tiro{d.n!==1?"s":""}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:"4px"}}>
+                  {[2,3,4,5,6].map(k=>{
+                    const cnt=d.dist[k]||0;
+                    if(!cnt)return null;
+                    const pct=Math.round(cnt/d.n*100);
+                    const col=k<=3?"#8e8":k===4?"#C9A84C":"#e88";
+                    return(
+                      <div key={k} style={{background:"#141210",border:`1px solid ${col}`,borderRadius:"3px",padding:"3px 6px",textAlign:"center",minWidth:"36px"}}>
+                        <div style={{color:col,fontSize:"13px",fontWeight:"bold"}}>{k===6?"6+":k}</div>
+                        <div style={{color:"#b09050",fontSize:"9px"}}>{pct}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          });
+        })()}
+      </div>
+
       <div style={S.card}>
         <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Por palo</div>
         {(()=>{
