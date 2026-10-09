@@ -428,7 +428,7 @@ function Auth({onLogin}){
       const local=lsGet("user:"+u);
       const s=sb||local;
       if(!s){setErr("Usuario no encontrado.");return}
-      const pass=lsGet("pass:"+u)||s.pass;
+      const pass=(sb&&sb.pass)||lsGet("pass:"+u)||s.pass;
       if(pass!==f.pass){setErr("Contraseña incorrecta.");return}
       const ud={username:s.username,name:s.name,hcp:s.hcp||18,hcpT:s.hcpt||s.hcpT||"libre",isCoach:false};
       lsSet("session",ud);lsSet("pass:"+u,f.pass);onLogin(ud);
@@ -1369,6 +1369,31 @@ function CoachPlayerStats({player}){
   );
 }
 
+function CoachPassReset({username}){
+  const [np,setNp]=useState("");
+  const [msg,setMsg]=useState("");
+  const [busy,setBusy]=useState(false);
+  async function doReset(){
+    if(!np.trim()){setMsg("Ingresá una nueva contraseña.");return;}
+    setBusy(true);setMsg("");
+    try{
+      await sbU("users",{username,pass:np.trim()});
+      lsSet("pass:"+username,np.trim());
+      setMsg("✓ Contraseña actualizada.");setNp("");
+    }catch(e){setMsg("Error al guardar.");}
+    finally{setBusy(false);}
+  }
+  return(
+    <div style={{marginBottom:"14px"}}>
+      <div style={{display:"flex",gap:"8px",marginBottom:"6px"}}>
+        <input style={{...S.inp,flex:1}} type="text" placeholder="Nueva contraseña" value={np} onChange={e=>setNp(e.target.value)}/>
+        <button style={S.btn("p")} onClick={doReset} disabled={busy}>{busy?"...":"Guardar"}</button>
+      </div>
+      {msg&&<div style={{fontSize:"12px",color:msg.startsWith("✓")?"#6a9a50":"#c04040"}}>{msg}</div>}
+    </div>
+  );
+}
+
 function CoachPanel(){
   const [tab,setTab]=useState("ranking");
   const [players,setPlayers]=useState([]);
@@ -1484,6 +1509,9 @@ function CoachPanel(){
           {selPlayerTab==="stats"&&<CoachPlayerStats player={selPlayer}/>}
           {selPlayerTab==="notas"&&(
             <div style={S.card}>
+              <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Resetear contraseña</div>
+              <CoachPassReset username={selPlayer.user.username}/>
+              <div style={{borderTop:"1px solid #5a4a20",marginTop:"2px",paddingTop:"14px"}}>
               <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Notas mentales</div>
               {(()=>{
                 const notas=selPlayer.user.notas||{};
@@ -1507,6 +1535,7 @@ function CoachPanel(){
                     return(<div key={k} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}><div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}</div><div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div></div>);
                   });
                 })()}
+              </div>
               </div>
             </div>
           )}
