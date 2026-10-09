@@ -1057,7 +1057,7 @@ function Stats({user}){
       try{
         const sb=await sbQ(`rounds?username=eq.${user.username}&order=created_at.desc`);
         if(sb&&sb.length){
-          const mapped=sb.map(r=>({id:r.id,courseName:r.course_name,date:r.date,totalShots:r.total_shots||0,totalPutts:r.total_putts||0,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,hcp:r.hcp||0,holes:r.holes||{}}));
+          const mapped=sb.map(r=>({id:r.id,courseName:r.course_name,date:r.date,numHoles:r.num_holes||18,totalShots:r.total_shots||0,totalPutts:r.total_putts||0,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,hcp:r.hcp||0,holes:r.holes||{}}));
           setAllRounds(mapped);
         }else{
           const idx=lsGet("rounds:"+user.username)||[];
@@ -1073,24 +1073,26 @@ function Stats({user}){
   },[]);
 
   function getFiltered(){
-    if(filtro==="ultima")return allRounds.slice(0,1);
+    let base=allRounds;
+    if(filtro==="9")base=allRounds.filter(r=>(r.numHoles||18)===9);
+    else if(filtro==="18")base=allRounds.filter(r=>(r.numHoles||18)===18);
     if(filtro==="seleccionar"){
       const sel=allRounds.filter(r=>selected[r.id]);
       return sel.length?sel:allRounds;
     }
-    return allRounds;
+    return base;
   }
   const rounds=getFiltered();
 
   return(
     <div style={S.page}>
       <div style={S.h2}>Mis Estadísticas</div>
-      {allRounds.length>1&&(
+      {allRounds.length>0&&(
         <div style={{...S.card,marginBottom:"14px",padding:"12px"}}>
           <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Ver estadísticas de</div>
           <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
-            {[["todas","Todas"],["ultima","Última vuelta"],["seleccionar","Seleccionar"]].map(([v,l])=>(
-              <button key={v} style={S.nb(filtro===v)} onClick={()=>setFiltro(v)}>{l}</button>
+            {[["todas","Todas"],["9","9 hoyos"],["18","18 hoyos"],["seleccionar","Seleccionar"]].map(([v,l])=>(
+              <button key={v} style={S.nb(filtro===v)} onClick={()=>{setFiltro(v);setSelected({});}}>{l}</button>
             ))}
           </div>
           {filtro==="seleccionar"&&(
@@ -1104,7 +1106,7 @@ function Stats({user}){
                     <input type="checkbox" checked={!!selected[r.id]} onChange={e=>setSelected(p=>({...p,[r.id]:e.target.checked}))} style={{width:"16px",height:"16px",accentColor:gold}}/>
                     <div>
                       <div style={{color:"#f5ead0",fontSize:"12px"}}>{nombre}</div>
-                      <div style={{color:"#b09050",fontSize:"10px"}}>{fecha} · {r.totalShots||r.total_shots||"—"} golpes</div>
+                      <div style={{color:"#b09050",fontSize:"10px"}}>{fecha} · {r.numHoles||18} hoyos · {r.totalShots||"—"} golpes</div>
                     </div>
                   </label>
                 );
@@ -1315,6 +1317,58 @@ function MisCanchas({user}){
   );
 }
 
+function CoachPlayerStats({player}){
+  const [filtro,setFiltro]=useState("todas");
+  const [selected,setSelected]=useState({});
+  const allRounds=player.rounds.map(r=>({
+    id:r.id,courseName:r.course_name||r.courseName,date:r.date,
+    numHoles:r.num_holes||r.numHoles||18,
+    totalShots:r.total_shots||r.totalShots||0,
+    totalPutts:r.total_putts||r.totalPutts||0,
+    totalChips:r.total_chips||r.totalChips||0,
+    totalBunker:r.total_bunker||r.totalBunker||0,
+    hcp:r.hcp||0,holes:r.holes||{}
+  }));
+  function getFiltered(){
+    let base=allRounds;
+    if(filtro==="9")base=allRounds.filter(r=>r.numHoles===9);
+    else if(filtro==="18")base=allRounds.filter(r=>r.numHoles===18);
+    if(filtro==="seleccionar"){const sel=allRounds.filter(r=>selected[r.id]);return sel.length?sel:allRounds;}
+    return base;
+  }
+  const rounds=getFiltered();
+  return(
+    <div>
+      {allRounds.length>0&&(
+        <div style={{...S.card,marginBottom:"14px",padding:"12px"}}>
+          <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Ver estadísticas de</div>
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+            {[["todas","Todas"],["9","9 hoyos"],["18","18 hoyos"],["seleccionar","Seleccionar"]].map(([v,l])=>(
+              <button key={v} style={S.nb(filtro===v)} onClick={()=>{setFiltro(v);setSelected({});}}>{l}</button>
+            ))}
+          </div>
+          {filtro==="seleccionar"&&(
+            <div style={{marginTop:"10px"}}>
+              <div style={{color:"#b09050",fontSize:"10px",marginBottom:"7px"}}>Marcá las vueltas a incluir:</div>
+              {allRounds.map(r=>(
+                <label key={r.id} style={{display:"flex",alignItems:"center",gap:"10px",padding:"7px 0",borderBottom:"1px solid #3a3020",cursor:"pointer"}}>
+                  <input type="checkbox" checked={!!selected[r.id]} onChange={e=>setSelected(p=>({...p,[r.id]:e.target.checked}))} style={{width:"16px",height:"16px",accentColor:gold}}/>
+                  <div>
+                    <div style={{color:"#f5ead0",fontSize:"12px"}}>{r.courseName||"Sin nombre"}</div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>{r.date} · {r.numHoles} hoyos · {r.totalShots} golpes</div>
+                  </div>
+                </label>
+              ))}
+              {Object.values(selected).every(v=>!v)&&<div style={{color:"#b09050",fontSize:"11px",marginTop:"6px",fontStyle:"italic"}}>Sin selección → se muestran todas.</div>}
+            </div>
+          )}
+        </div>
+      )}
+      <StatsView rounds={rounds} hcp={player.user.hcp} isCoach={true}/>
+    </div>
+  );
+}
+
 function CoachPanel(){
   const [tab,setTab]=useState("ranking");
   const [players,setPlayers]=useState([]);
@@ -1427,10 +1481,7 @@ function CoachPanel(){
               <button key={t} style={{...S.nb(selPlayerTab===t),flex:1}} onClick={()=>setSelPlayerTab(t)}>{l}</button>
             ))}
           </div>
-          {selPlayerTab==="stats"&&(()=>{
-            const rounds=selPlayer.rounds.map(r=>({id:r.id,totalShots:r.total_shots||r.totalShots||0,totalPutts:r.total_putts||r.totalPutts||0,totalChips:r.total_chips||r.totalChips||0,totalBunker:r.total_bunker||r.totalBunker||0,hcp:r.hcp||0,holes:r.holes||{}}));
-            return <StatsView rounds={rounds} hcp={selPlayer.user.hcp} isCoach={true}/>;
-          })()}
+          {selPlayerTab==="stats"&&<CoachPlayerStats player={selPlayer}/>}
           {selPlayerTab==="notas"&&(
             <div style={S.card}>
               <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Notas mentales</div>
