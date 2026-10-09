@@ -121,7 +121,12 @@ function calcStats(rounds){
   const dp1vals=[];
   rounds.forEach(r=>Object.values(r.holes||{}).forEach(h=>{const v=parseFloat(h.distPutt1);if(v>0)dp1vals.push(v);}));
   const avgDistPutt1=dp1vals.length?(dp1vals.reduce((a,b)=>a+b,0)/dp1vals.length).toFixed(1):"—";
-  return{n,avgGross,avgNeto,best,bestNeto,avgPutts,avgPuttsH,avgChips,avgChipsH,avgBunker,avgBunkerH,avgDistPutt1,dp1count:dp1vals.length};
+  // Dist. total recorrida pateando por vuelta (suma distPutt1 de cada vuelta, promedio entre vueltas)
+  const dp1PerRound=rounds.map(r=>{
+    let s=0;Object.values(r.holes||{}).forEach(h=>{const v=parseFloat(h.distPutt1);if(v>0)s+=v;});return s;
+  }).filter(v=>v>0);
+  const avgDistPutt1Round=dp1PerRound.length?(dp1PerRound.reduce((a,b)=>a+b,0)/dp1PerRound.length).toFixed(1):"—";
+  return{n,avgGross,avgNeto,best,bestNeto,avgPutts,avgPuttsH,avgChips,avgChipsH,avgBunker,avgBunkerH,avgDistPutt1,dp1count:dp1vals.length,avgDistPutt1Round,dp1RoundCount:dp1PerRound.length};
 }
 
 function StatsView({rounds,hcp,isCoach}){
@@ -140,8 +145,9 @@ function StatsView({rounds,hcp,isCoach}){
         <StatCard label="PROM. PUTTS/HOYO" value={st.avgPuttsH}/>
       </div>
       {st.dp1count>0&&(
-        <div style={{marginBottom:"8px"}}>
-          <StatCard label="DIST. PROM. PRIMER PUTT" value={st.avgDistPutt1+" yds"} sub={st.dp1count+" hoyo"+( st.dp1count!==1?"s":""+" registrado"+(st.dp1count!==1?"s":""))}/>
+        <div style={{...S.g2,marginBottom:"8px"}}>
+          <StatCard label="DIST. PROM. PRIMER PUTT" value={st.avgDistPutt1+" yds"} sub={st.dp1count+" hoyo"+(st.dp1count!==1?"s":"")+" registrado"+(st.dp1count!==1?"s":"")}/>
+          <StatCard label="DIST. PROM. RECORRIDA/VUELTA" value={st.avgDistPutt1Round+" yds"} sub={st.dp1RoundCount+" vuelta"+(st.dp1RoundCount!==1?"s":"")}/>
         </div>
       )}
       <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Juego corto</div>
@@ -763,6 +769,14 @@ function RoundDetail({round,onBack,coachView,onRoundUpdated}){
   }
   const ida=is18?subTotal(1,9):"—";
   const vuelta=is18?subTotal(10,18):"—";
+  // Stats de putting de esta vuelta
+  const dp1thisRound=(()=>{
+    const vals=[];
+    for(let h=1;h<=count;h++){const v=parseFloat(holes[h]?.distPutt1);if(v>0)vals.push(v);}
+    return vals;
+  })();
+  const avgDP1this=dp1thisRound.length?(dp1thisRound.reduce((a,b)=>a+b,0)/dp1thisRound.length).toFixed(1):null;
+  const totalDP1this=dp1thisRound.length?dp1thisRound.reduce((a,b)=>a+b,0):null;
 
   async function saveAnalytics(){
     setSaving(true);setMsg("");
@@ -824,6 +838,7 @@ function RoundDetail({round,onBack,coachView,onRoundUpdated}){
             )}
             <div style={{color:"#b09050",fontSize:"11px"}}>{totalPutts} putts · {totalChips} chips · {totalBunker} búnker</div>
             <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {totalShots-(round.hcp||0)}</div>
+            {avgDP1this&&<div style={{color:"#b09050",fontSize:"11px",marginTop:"3px"}}>Prom. 1er putt <span style={{color:"#f5ead0"}}>{avgDP1this} yds</span> · Total <span style={{color:"#f5ead0"}}>{totalDP1this} yds</span></div>}
           </div>
         </div>
 
@@ -1002,6 +1017,9 @@ function MyRounds({user}){
       {rounds.map(r=>{
         const is18=getHoles(r)===18;
         const {ida,vuelta}=is18?getIdaVuelta(r):{ida:null,vuelta:null};
+        const dp1r=(()=>{const vals=[];Object.values(r.holes||{}).forEach(h=>{const v=parseFloat(h.distPutt1);if(v>0)vals.push(v);});return vals;})();
+        const avgDP1r=dp1r.length?(dp1r.reduce((a,b)=>a+b,0)/dp1r.length).toFixed(1):null;
+        const totDP1r=dp1r.length?dp1r.reduce((a,b)=>a+b,0):null;
         return(
           <div key={r.id} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelected(r)}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
@@ -1014,6 +1032,7 @@ function MyRounds({user}){
                     IDA <span style={{color:"#f5ead0",fontWeight:"bold"}}>{ida}</span> · VUELTA <span style={{color:"#f5ead0",fontWeight:"bold"}}>{vuelta}</span>
                   </div>
                 )}
+                {avgDP1r&&<div style={{color:"#b09050",fontSize:"11px",marginTop:"2px"}}>1er putt <span style={{color:"#f5ead0"}}>{avgDP1r} yds</span> · recorrido <span style={{color:"#f5ead0"}}>{totDP1r} yds</span></div>}
               </div>
               <div style={{textAlign:"right"}}>
                 <div style={{color:gold,fontSize:"22px",fontWeight:"bold"}}>{getShots(r)}</div>
@@ -1448,12 +1467,16 @@ function CoachPanel(){
                 const h=r.holes||{};
                 let ida18=0,vuelta18=0;
                 if(is18r){for(let i=1;i<=9;i++)ida18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);for(let i=10;i<=18;i++)vuelta18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);}
+                const dp1rc=(()=>{const vals=[];Object.values(h).forEach(hh=>{const v=parseFloat(hh.distPutt1);if(v>0)vals.push(v);});return vals;})();
+                const avgDP1rc=dp1rc.length?(dp1rc.reduce((a,b)=>a+b,0)/dp1rc.length).toFixed(1):null;
+                const totDP1rc=dp1rc.length?dp1rc.reduce((a,b)=>a+b,0):null;
                 return(
                 <div key={r.id} style={{cursor:"pointer",padding:"9px 0",borderBottom:"1px solid #3a3020",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setSelRound(r)}>
                   <div>
                     <div style={{color:"#f5ead0",fontSize:"13px"}}>{r.course_name||r.courseName}</div>
                     <div style={{color:"#b09050",fontSize:"10px"}}>{r.date} · {r.format} · {r.num_holes||r.numHoles||18} hoyos</div>
                     {is18r&&ida18>0&&vuelta18>0&&<div style={{color:"#b09050",fontSize:"10px"}}>IDA <span style={{color:"#f5ead0"}}>{ida18}</span> · VUELTA <span style={{color:"#f5ead0"}}>{vuelta18}</span></div>}
+                    {avgDP1rc&&<div style={{color:"#b09050",fontSize:"10px"}}>1er putt <span style={{color:"#f5ead0"}}>{avgDP1rc} yds</span> · recorrido <span style={{color:"#f5ead0"}}>{totDP1rc} yds</span></div>}
                   </div>
                   <div style={{textAlign:"right"}}>
                     <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.total_shots||r.totalShots}</div>
@@ -1475,6 +1498,9 @@ function CoachPanel(){
             const h=r.holes||{};
             let ida18=0,vuelta18=0;
             if(is18r){for(let i=1;i<=9;i++)ida18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);for(let i=10;i<=18;i++)vuelta18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);}
+            const dp1rg=(()=>{const vals=[];Object.values(h).forEach(hh=>{const v=parseFloat(hh.distPutt1);if(v>0)vals.push(v);});return vals;})();
+            const avgDP1rg=dp1rg.length?(dp1rg.reduce((a,b)=>a+b,0)/dp1rg.length).toFixed(1):null;
+            const totDP1rg=dp1rg.length?dp1rg.reduce((a,b)=>a+b,0):null;
             return(
             <div key={r.id} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelRound(r)}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1482,6 +1508,7 @@ function CoachPanel(){
                   <div style={{color:"#f5ead0",fontWeight:"bold"}}>{r.player_name||r.playerName}</div>
                   <div style={{color:"#b09050",fontSize:"11px"}}>{r.course_name||r.courseName} · {r.date} · {r.num_holes||r.numHoles||18} hoyos</div>
                   {is18r&&ida18>0&&vuelta18>0&&<div style={{color:"#b09050",fontSize:"11px"}}>IDA <span style={{color:"#f5ead0"}}>{ida18}</span> · VUELTA <span style={{color:"#f5ead0"}}>{vuelta18}</span></div>}
+                  {avgDP1rg&&<div style={{color:"#b09050",fontSize:"11px"}}>1er putt <span style={{color:"#f5ead0"}}>{avgDP1rg} yds</span> · recorrido <span style={{color:"#f5ead0"}}>{totDP1rg} yds</span></div>}
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{r.total_shots||r.totalShots}</div>
