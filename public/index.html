@@ -33,6 +33,7 @@ const H={"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"applic
 
 async function sbQ(path){try{const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H});if(!r.ok)return[];return await r.json();}catch{return[]}}
 async function sbU(table,data){try{const r=await fetch(SB_URL+"/rest/v1/"+table,{method:"POST",headers:H,body:JSON.stringify(data)});return r.ok;}catch{return false}}
+async function sbPatch(table,match,data){try{const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");const r=await fetch(SB_URL+"/rest/v1/"+table+"?"+q,{method:"PATCH",headers:H,body:JSON.stringify(data)});return r.ok;}catch{return false}}
 async function sbD(table,match){try{const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");const r=await fetch(SB_URL+"/rest/v1/"+table+"?"+q,{method:"DELETE",headers:H});return r.ok;}catch{return false}}
 
 function lsGet(k){try{const v=localStorage.getItem("fg_"+k);return v?JSON.parse(v):null}catch{return null}}
@@ -1377,7 +1378,8 @@ function CoachPassReset({username}){
     if(!np.trim()){setMsg("Ingresá una nueva contraseña.");return;}
     setBusy(true);setMsg("");
     try{
-      await sbU("users",{username,pass:np.trim()});
+      const ok=await sbPatch("users",{username},{"pass":np.trim()});
+      if(!ok)throw new Error("patch failed");
       lsSet("pass:"+username,np.trim());
       setMsg("✓ Contraseña actualizada.");setNp("");
     }catch(e){setMsg("Error al guardar.");}
