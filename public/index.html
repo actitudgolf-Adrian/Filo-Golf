@@ -1219,7 +1219,7 @@ function MisCanchas({user}){
     const holesOnly={};
     for(let h=1;h<=parseInt(numHoles)||18;h++){
       const d=hoyos[h]||{};
-      holesOnly[h]={par:d.par||"",dist:d.dist||""};
+      holesOnly[h]={par:d.par||"",dist:d.dist||"",hcpIdx:d.hcpIdx||""};
     }
     const c=lsGet("configs:"+user.username)||{};
     c[key]={name:cfgName.trim(),courseId,holes:holesOnly,savedAt:Date.now()};
@@ -1290,20 +1290,22 @@ function MisCanchas({user}){
 
         {/* Tabla de hoyos */}
         <div style={{...S.card,background:"#141210",marginBottom:"12px",padding:"12px"}}>
-          <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Par y distancia por hoyo</div>
-          <div style={{display:"grid",gridTemplateColumns:"40px 1fr 1fr",gap:"6px",marginBottom:"6px"}}>
+          <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Par, distancia e índice por hoyo</div>
+          <div style={{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr",gap:"6px",marginBottom:"6px"}}>
             <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>H</div>
             <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>Par</div>
-            <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>Dist (yds)</div>
+            <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>Dist</div>
+            <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>Índice</div>
           </div>
           {Array.from({length:holeCount},(_,i)=>i+1).map(h=>{
             const d=hoyos[h]||{};
-            const updH=(k,v)=>setHoyos(p=>({...p,[h]:{...(p[h]||{}),par:p[h]?.par||"",dist:p[h]?.dist||"",[k]:v}}));
+            const updH=(k,v)=>setHoyos(p=>({...p,[h]:{...(p[h]||{}),par:p[h]?.par||"",dist:p[h]?.dist||"",hcpIdx:p[h]?.hcpIdx||"",[k]:v}}));
             return(
-              <div key={h} style={{display:"grid",gridTemplateColumns:"40px 1fr 1fr",gap:"6px",marginBottom:"4px",alignItems:"center"}}>
+              <div key={h} style={{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr",gap:"6px",marginBottom:"4px",alignItems:"center"}}>
                 <div style={{color:gold,fontSize:"12px",fontWeight:"bold",textAlign:"center"}}>{h}</div>
-                <input style={{...S.inp,fontSize:"14px",padding:"7px",textAlign:"center"}} type="number" min="3" max="6" placeholder="—" value={d.par||""} onChange={e=>updH("par",e.target.value)}/>
-                <input style={{...S.inp,fontSize:"14px",padding:"7px",textAlign:"center"}} type="number" min="0" max="999" placeholder="—" value={d.dist||""} onChange={e=>updH("dist",e.target.value)}/>
+                <input style={{...S.inp,fontSize:"13px",padding:"6px",textAlign:"center"}} type="number" min="3" max="6" placeholder="—" value={d.par||""} onChange={e=>updH("par",e.target.value)}/>
+                <input style={{...S.inp,fontSize:"13px",padding:"6px",textAlign:"center"}} type="number" min="0" max="999" placeholder="—" value={d.dist||""} onChange={e=>updH("dist",e.target.value)}/>
+                <input style={{...S.inp,fontSize:"13px",padding:"6px",textAlign:"center"}} type="number" min="1" max="18" placeholder="—" value={d.hcpIdx||""} onChange={e=>updH("hcpIdx",e.target.value)}/>
               </div>
             );
           })}
