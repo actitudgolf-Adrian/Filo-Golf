@@ -182,22 +182,40 @@ function GreenStats({rounds}){
   const [filtMin,setFiltMin]=useState("");
   const [filtMax,setFiltMax]=useState("");
 
-  // Collect all shots with yards data
+  // Collect all shots with yards data (supports tirosGreen[] new format and legacy yards/palo)
   const shots=[];
   rounds.forEach(r=>{
     Object.values(r.holes||{}).forEach(h=>{
       if(!parseInt(h.shots))return; // hoyo no jugado
       const isPar3=parseInt(h.par)===3;
-      const yds=parseInt(h.yards)||(isPar3?parseInt(h.dist):0);
-      if(!yds)return;
-      shots.push({
-        yds,
-        palo:(h.palo||"").trim().toUpperCase()||"—",
-        putts:parseInt(h.putts)||0,
-        chips:parseInt(h.chips)||0,
-        bunker:parseInt(h.bunker)||0,
-        enGreen:(parseInt(h.putts)||0)>0&&(parseInt(h.chips)||0)===0&&(parseInt(h.bunker)||0)===0
-      });
+      const putts=parseInt(h.putts)||0;
+      const chips=parseInt(h.chips)||0;
+      const bunker=parseInt(h.bunker)||0;
+      const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+      if(tirosG){
+        // New format: multiple tiros per hole
+        tirosG.forEach(t=>{
+          const yds=parseInt(t.dist)||(isPar3?parseInt(h.dist):0);
+          if(!yds)return;
+          const resultado=t.resultado||"";
+          shots.push({
+            yds,
+            palo:(t.palo||"").trim().toUpperCase()||"—",
+            putts,chips,bunker,
+            enGreen:resultado==="green"
+          });
+        });
+      }else{
+        // Legacy format: single yards/palo on hole
+        const yds=parseInt(h.yards)||(isPar3?parseInt(h.dist):0);
+        if(!yds)return;
+        shots.push({
+          yds,
+          palo:(h.palo||"").trim().toUpperCase()||"—",
+          putts,chips,bunker,
+          enGreen:putts>0&&chips===0&&bunker===0
+        });
+      }
     });
   });
 
@@ -256,6 +274,108 @@ function GreenStats({rounds}){
         })}
       </div>
 
+      {(()=>{
+        // Golpes perdidos atacando greens: por cada hoyo, cantidad de tiros al green - 1 = golpes perdidos
+        // Se acumula por vuelta para mostrar evolución y promedio total
+        const gpRondas=[];
+        rounds.forEach(r=>{
+          let gpRonda=0;let hoyosConDato=0;
+          Object.values(r.holes||{}).forEach(h=>{
+            if(!parseInt(h.shots))return;
+            const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+            // Solo contar hoyos con datos de tiro al green
+            if(tirosG){
+              const perdidos=tirosG.length-1; // 1 tiro = 0 perdidos, 2 tiros = 1 perdido, etc.
+              gpRonda+=perdidos;hoyosConDato++;
+            }else if(h.yards||h.palo){
+              // legacy: single shot, 0 perdidos (no podemos saber si hubo varios)
+              hoyosConDato++;
+            }
+          });
+          if(hoyosConDato>0)gpRondas.push({fecha:r.date||r.created_at||"",numHoles:r.numHoles||18,gp:gpRonda,hoyos:hoyosConDato});
+        });
+        if(!gpRondas.length)return null;
+        const totalGP=gpRondas.reduce((s,r)=>s+r.gp,0);
+        const totalHoyos=gpRondas.reduce((s,r)=>s+r.hoyos,0);
+        const promGP=(totalGP/gpRondas.length).toFixed(1);
+        const promGPHoyo=(totalGP/totalHoyos).toFixed(2);
+        const colorGP=parseFloat(promGP)<=1?"#8e8":parseFloat(promGP)<=3?"#C9A84C":"#e88";
+        // Por rango — golpes perdidos según distancia del primer tiro
+        const gpRango={};
+        rounds.forEach(r=>{
+          Object.values(r.holes||{}).forEach(h=>{
+            if(!parseInt(h.shots))return;
+            const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+            if(!tirosG||tirosG.length===0)return;
+            const isPar3h=parseInt(h.par)===3;
+            const yds=parseInt(tirosG[0].dist)||(isPar3h?parseInt(h.dist):0);
+            if(!yds)return;
+            const perdidos=tirosG.length-1;
+            const rng=RANGOS.find(rr=>yds>=rr.min&&yds<=rr.max);
+            if(!rng)return;
+            if(!gpRango[rng.l])gpRango[rng.l]={total:0,n:0};
+            gpRango[rng.l].total+=perdidos;gpRango[rng.l].n++;
+          });
+        });
+        const rangosGP=RANGOS.filter(r=>gpRango[r.l]);
+        return(
+          <div style={{...S.card,marginBottom:"8px"}}>
+            <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Golpes perdidos atacando greens</div>
+            <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>Cada tiro extra hasta llegar a green, chip o búnker cuenta como un golpe perdido</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"12px"}}>
+              <div style={{...S.card,textAlign:"center",padding:"12px",background:"#141210"}}>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",marginBottom:"4px"}}>PROM. POR VUELTA</div>
+                <div style={{color:colorGP,fontSize:"30px",fontWeight:"bold"}}>{promGP}</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>golpes</div>
+              </div>
+              <div style={{...S.card,textAlign:"center",padding:"12px",background:"#141210"}}>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",marginBottom:"4px"}}>PROM. POR HOYO</div>
+                <div style={{color:colorGP,fontSize:"30px",fontWeight:"bold"}}>{promGPHoyo}</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>golpes</div>
+              </div>
+            </div>
+            {rangosGP.length>0&&(
+              <div style={{marginBottom:"12px"}}>
+                <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Por distancia de ataque</div>
+                {rangosGP.map(rng=>{
+                  const d=gpRango[rng.l];
+                  const avg=(d.total/d.n).toFixed(2);
+                  const avgN=parseFloat(avg);
+                  const col=avgN<=0.3?"#8e8":avgN<=0.8?"#C9A84C":"#e88";
+                  return(
+                    <div key={rng.l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #3a3020"}}>
+                      <div style={{color:"#f5ead0",fontSize:"13px"}}>{rng.l} yds</div>
+                      <div style={{textAlign:"right"}}>
+                        <span style={{color:col,fontSize:"18px",fontWeight:"bold"}}>{avg}</span>
+                        <span style={{color:"#b09050",fontSize:"10px",marginLeft:"5px"}}>golpes prom · {d.n} hoyos</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div>
+              <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Evolución por vuelta</div>
+              {gpRondas.slice().reverse().map((r,i)=>{
+                const col=r.gp===0?"#8e8":r.gp<=2?"#C9A84C":"#e88";
+                const fecha=r.fecha?new Date(r.fecha).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}):"";
+                const barW=Math.min(100,r.gp/Math.max(...gpRondas.map(x=>x.gp))*100||0);
+                return(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:"8px",padding:"5px 0",borderBottom:"1px solid #2a2010"}}>
+                    <div style={{color:"#b09050",fontSize:"10px",minWidth:"36px"}}>{fecha}</div>
+                    <div style={{flex:1,height:"12px",background:"#1a1612",borderRadius:"2px",overflow:"hidden"}}>
+                      <div style={{width:barW+"%",height:"100%",background:col,borderRadius:"2px",transition:"width 0.3s"}}/>
+                    </div>
+                    <div style={{color:col,fontSize:"14px",fontWeight:"bold",minWidth:"24px",textAlign:"right"}}>{r.gp}</div>
+                    <div style={{color:"#b09050",fontSize:"9px",minWidth:"28px"}}>{r.numHoles}h</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{...S.card,marginBottom:"8px"}}>
         <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Golpes para terminar el hoyo</div>
         <div style={{color:"#b09050",fontSize:"10px",marginBottom:"10px"}}>Tiro al green + chips + búnker + putts</div>
@@ -265,12 +385,15 @@ function GreenStats({rounds}){
             Object.values(r.holes||{}).forEach(h=>{
               if(!parseInt(h.shots))return;
               const isPar3h=parseInt(h.par)===3;
-              const yds=parseInt(h.yards)||(isPar3h?parseInt(h.dist):0);
-              if(!yds)return;
               const putts=parseInt(h.putts)||0;
               const chips=parseInt(h.chips)||0;
               const bunker=parseInt(h.bunker)||0;
               if(putts===0)return; // sin putts no sabemos si terminó
+              const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+              const yds=tirosG
+                ?parseInt(tirosG[0].dist)||(isPar3h?parseInt(h.dist):0)
+                :parseInt(h.yards)||(isPar3h?parseInt(h.dist):0);
+              if(!yds)return;
               const costo=1+chips+bunker+putts;
               const rng=RANGOS.find(r=>yds>=r.min&&yds<=r.max);
               if(!rng)return;
@@ -515,13 +638,27 @@ function Auth({onLogin}){
 
 function HoleCard({hole,data,onChange,readonly}){
   const [open,setOpen]=useState(false);
-  const d=data||{shots:"",putts:"",chips:0,bunker:0,yards:"",par:"",dist:"",distPutt1:"",salida:"",zones:{},note:""};
+  const d=data||{shots:"",putts:"",chips:0,bunker:0,tirosGreen:[],par:"",dist:"",hcpIdx:"",distPutt1:"",salida:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
   const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note||d.salida;
   const bigInp={...S.inp,fontSize:"22px",padding:"14px",textAlign:"center",fontWeight:"bold"};
   const smInp={...S.inp,fontSize:"16px",padding:"11px",textAlign:"center"};
   const ctrBtn={...S.btn("g"),padding:"10px 18px",fontSize:"22px",lineHeight:1,minWidth:"50px"};
+  const tirosG=d.tirosGreen||[];
+  const lastTiro=tirosG[tirosG.length-1];
+  const greenCerrado=lastTiro&&(lastTiro.resultado==="green"||lastTiro.resultado==="chip"||lastTiro.resultado==="bunker");
+  function addTiro(){
+    const newTiros=[...tirosG,{dist:"",palo:"",resultado:""}];
+    upd("tirosGreen",newTiros);
+  }
+  function updTiro(i,k,v){
+    const newTiros=tirosG.map((t,idx)=>idx===i?{...t,[k]:v}:t);
+    upd("tirosGreen",newTiros);
+  }
+  function removeTiro(i){
+    upd("tirosGreen",tirosG.filter((_,idx)=>idx!==i));
+  }
   return(
     <div style={{background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"8px",padding:"16px",marginBottom:"14px"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",paddingBottom:"10px",borderBottom:"1px solid #5a4a20"}}>
@@ -566,15 +703,38 @@ function HoleCard({hole,data,onChange,readonly}){
           </div>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"10px"}}>
-        <div>
-          <label style={S.lbl}>Dist. tiro a green (yds)</label>
-          <input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.yards||""} disabled={readonly} onChange={e=>upd("yards",e.target.value)}/>
-        </div>
-        <div>
-          <label style={S.lbl}>Palo escogido</label>
-          <input style={smInp} type="text" placeholder="7H, PW..." value={d.palo||""} disabled={readonly} onChange={e=>upd("palo",e.target.value)}/>
-        </div>
+      <div style={{marginBottom:"12px"}}>
+        <label style={S.lbl}>Tiros al green</label>
+        {tirosG.map((t,i)=>(
+          <div key={i} style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"10px",marginBottom:"8px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+              <span style={{color:gold,fontSize:"12px",fontWeight:"bold"}}>Tiro {i+1}</span>
+              {!readonly&&<button style={{...S.btn("d"),padding:"4px 10px",fontSize:"11px"}} onClick={()=>removeTiro(i)}>✕</button>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"8px"}}>
+              <div>
+                <label style={S.lbl}>Dist (yds)</label>
+                <input style={smInp} type="number" min="0" max="999" placeholder="—" value={t.dist||""} disabled={readonly} onChange={e=>updTiro(i,"dist",e.target.value)}/>
+              </div>
+              <div>
+                <label style={S.lbl}>Palo</label>
+                <input style={smInp} type="text" placeholder="7H, PW..." value={t.palo||""} disabled={readonly} onChange={e=>updTiro(i,"palo",e.target.value.toUpperCase())}/>
+              </div>
+            </div>
+            <label style={S.lbl}>Resultado</label>
+            <div style={{display:"flex",gap:"6px"}}>
+              {["green","chip","bunker"].map(r=>(
+                <button key={r} style={{...S.btn(t.resultado===r?(r==="green"?"p":"d"):"g"),flex:1,padding:"8px 4px",fontSize:"12px",textTransform:"capitalize"}} disabled={readonly} onClick={()=>updTiro(i,"resultado",t.resultado===r?"":r)}>
+                  {r==="green"?"✓ Green":r==="chip"?"Chip":"Búnker"}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {!readonly&&!greenCerrado&&(
+          <button style={{...S.btn("g"),width:"100%",padding:"10px",fontSize:"13px"}} onClick={addTiro}>+ Agregar tiro al green</button>
+        )}
+        {readonly&&tirosG.length===0&&<div style={{color:"#b09050",fontSize:"11px",fontStyle:"italic"}}>{parseInt(d.par)===3?"Tiro directo (par 3)":"Sin tiros registrados"}</div>}
       </div>
       {(parseInt(d.putts)||0)>0&&(
         <div style={{marginBottom:"10px"}}>
@@ -632,6 +792,32 @@ function NewRound({user,onSave,onCancel}){
 
   async function save(){
     if(!meta.courseId){setErr("Seleccioná una cancha.");return}
+    // Validación por hoyo
+    const avisos=[];
+    for(let h=1;h<=holeCount;h++){
+      const hd=holes[h]||{};
+      if(!parseInt(hd.shots)){avisos.push(`Hoyo ${h}: falta cantidad de golpes`);continue;}
+      if(parseInt(hd.putts)===""||hd.putts===""){avisos.push(`Hoyo ${h}: falta cantidad de putts`);}
+      const par=parseInt(hd.par);
+      const tirosG=hd.tirosGreen||[];
+      if(par>=4){
+        if(tirosG.length===0){avisos.push(`Hoyo ${h} (par ${par||"?"}): falta al menos un tiro al green`);}
+        else{
+          tirosG.forEach((t,i)=>{
+            if(!t.dist)avisos.push(`Hoyo ${h} tiro ${i+1}: falta distancia`);
+            if(!t.palo)avisos.push(`Hoyo ${h} tiro ${i+1}: falta palo`);
+            if(!t.resultado)avisos.push(`Hoyo ${h} tiro ${i+1}: falta resultado (green/chip/búnker)`);
+          });
+        }
+      }
+      if(par===3&&tirosG.length>0){
+        tirosG.forEach((t,i)=>{
+          if(t.dist&&!t.palo)avisos.push(`Hoyo ${h} tiro ${i+1}: falta palo`);
+          if(!t.resultado&&(t.dist||t.palo))avisos.push(`Hoyo ${h} tiro ${i+1}: falta resultado`);
+        });
+      }
+    }
+    if(avisos.length){setErr("Completá estos datos antes de guardar:\n• "+avisos.slice(0,5).join("\n• ")+(avisos.length>5?`\n• ...y ${avisos.length-5} más`:"")); return;}
     setSaving(true);
     try{
       const id=Date.now().toString();
