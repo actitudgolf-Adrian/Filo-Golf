@@ -186,7 +186,9 @@ function GreenStats({rounds}){
   const shots=[];
   rounds.forEach(r=>{
     Object.values(r.holes||{}).forEach(h=>{
-      const yds=parseInt(h.yards||h.dist);
+      if(!parseInt(h.shots))return; // hoyo no jugado
+      const isPar3=parseInt(h.par)===3;
+      const yds=parseInt(h.yards)||(isPar3?parseInt(h.dist):0);
       if(!yds)return;
       shots.push({
         yds,
@@ -261,7 +263,9 @@ function GreenStats({rounds}){
           const costoMap={};
           rounds.forEach(r=>{
             Object.values(r.holes||{}).forEach(h=>{
-              const yds=parseInt(h.yards||h.dist);
+              if(!parseInt(h.shots))return;
+              const isPar3h=parseInt(h.par)===3;
+              const yds=parseInt(h.yards)||(isPar3h?parseInt(h.dist):0);
               if(!yds)return;
               const putts=parseInt(h.putts)||0;
               const chips=parseInt(h.chips)||0;
