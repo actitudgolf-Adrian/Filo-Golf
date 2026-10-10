@@ -665,24 +665,41 @@ function NewRound({user,onSave,onCancel}){
           <div style={S.h2}>Datos de la vuelta</div>
           {err&&<div style={S.alt("e")}>{err}</div>}
           <label style={S.lbl}>Cancha</label>
-          <select style={{...S.sel,marginBottom:"11px"}} value={meta.courseId} onChange={e=>{setMeta(m=>({...m,courseId:e.target.value,savedConfig:""}));setSavedConfigs({...PRESET_CONFIGS,...(lsGet("configs:"+user.username)||{})});}}>
+          <select style={{...S.sel,marginBottom:"11px"}} value={meta.courseId} onChange={e=>{
+            const cid=e.target.value;
+            const allCfgs={...PRESET_CONFIGS,...(lsGet("configs:"+user.username)||{})};
+            setSavedConfigs(allCfgs);
+            const cfgsForNew=Object.keys(allCfgs).filter(k=>k.startsWith(cid+"|"));
+            if(cfgsForNew.length===1){
+              // única config: cargar automáticamente
+              const cfg=allCfgs[cfgsForNew[0]];
+              const newH={};
+              Object.entries(cfg.holes||{}).forEach(([h,d])=>{newH[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
+              setHoles(newH);setMeta(m=>({...m,courseId:cid,savedConfig:cfgsForNew[0],numHoles:Object.keys(cfg.holes||{}).length}));
+            }else{
+              setHoles({});setMeta(m=>({...m,courseId:cid,savedConfig:"",numHoles:18}));
+            }
+          }}>
             <option value="">Seleccioná una cancha</option>
             {COURSES.map(c=><option key={c.id} value={c.id}>{c.name} — {c.city}</option>)}
           </select>
-          {meta.courseId&&configsForCourse.length>0&&(
+          {meta.courseId&&configsForCourse.length>1&&(
             <div style={{marginBottom:"11px"}}>
-              <label style={S.lbl}>Configuración guardada (opcional)</label>
-              <select style={S.sel} value={meta.savedConfig||""} onChange={e=>{
-                const cfg=savedConfigs[e.target.value];
-                if(cfg){
-                  const newH={};
-                  Object.entries(cfg.holes||{}).forEach(([h,d])=>{newH[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
-                  setHoles(newH);setMeta(m=>({...m,savedConfig:e.target.value,numHoles:Object.keys(cfg.holes||{}).length}));
-                }else{setMeta(m=>({...m,savedConfig:""}));}
-              }}>
-                <option value="">Sin configuración guardada</option>
-                {configsForCourse.map(k=><option key={k} value={k}>{savedConfigs[k].name}</option>)}
-              </select>
+              <label style={S.lbl}>Elegí el tee</label>
+              <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                {configsForCourse.map(k=>{
+                  const cfg=savedConfigs[k];
+                  const label=cfg.name.replace(/^.*?(Azul|Blanca|Damas|Roja|Amarilla|Negra|Blanco|Rojo|Amarillo|Negro)/i,"$1")||cfg.name;
+                  const active=meta.savedConfig===k;
+                  return(
+                    <button key={k} style={{...S.btn(active?"p":"g"),minWidth:"70px"}} onClick={()=>{
+                      const newH={};
+                      Object.entries(cfg.holes||{}).forEach(([h,d])=>{newH[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
+                      setHoles(newH);setMeta(m=>({...m,savedConfig:k,numHoles:Object.keys(cfg.holes||{}).length}));
+                    }}>{label}</button>
+                  );
+                })}
+              </div>
             </div>
           )}
           <label style={S.lbl}>Cantidad de hoyos</label>
