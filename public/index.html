@@ -137,6 +137,216 @@ function calcStats(rounds){
   return{n,avgGross,avgNeto,best,bestNeto,avgPutts,avgPuttsH,avgChips,avgChipsH,avgBunker,avgBunkerH,avgDistPutt1,dp1count:dp1vals.length,avgDistPutt1Round,dp1RoundCount:dp1PerRound.length};
 }
 
+function HoleAnalysis({rounds}){
+  // Collect hole-level data with par, hcpIdx, dist, score, putts, chips, bunker, tirosGreen
+  const hoyos=[];
+  rounds.forEach(r=>{
+    Object.values(r.holes||{}).forEach(h=>{
+      const shots=parseInt(h.shots);
+      if(!shots)return;
+      const par=parseInt(h.par);
+      if(!par)return;
+      const hcpIdx=parseInt(h.hcpIdx)||null;
+      const dist=parseInt(h.dist)||null;
+      const putts=parseInt(h.putts)||0;
+      const chips=parseInt(h.chips)||0;
+      const bunker=parseInt(h.bunker)||0;
+      const diff=shots-par; // relativo al par: 0=par, -1=birdie, +1=bogey, etc.
+      const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+      const gpAtaque=tirosG?tirosG.length-1:0;
+      hoyos.push({par,hcpIdx,dist,shots,diff,putts,chips,bunker,gpAtaque});
+    });
+  });
+  if(hoyos.length<9)return null;
+
+  // --- POR PAR ---
+  function statsPorPar(p){
+    const hs=hoyos.filter(h=>h.par===p);
+    if(!hs.length)return null;
+    const n=hs.length;
+    const avgDiff=(hs.reduce((s,h)=>s+h.diff,0)/n);
+    const avgPutts=(hs.reduce((s,h)=>s+h.putts,0)/n).toFixed(1);
+    const dist={birdie:0,par:0,bogey:0,doble:0,mas:0};
+    hs.forEach(h=>{
+      if(h.diff<=-1)dist.birdie++;
+      else if(h.diff===0)dist.par++;
+      else if(h.diff===1)dist.bogey++;
+      else if(h.diff===2)dist.doble++;
+      else dist.mas++;
+    });
+    return{n,avgDiff,avgPutts,dist};
+  }
+
+  // --- POR ÍNDICE (grupos: fáciles 13-18, medios 7-12, difíciles 1-6) ---
+  const grupos=[
+    {l:"Fáciles",sub:"índice 13–18",min:13,max:18},
+    {l:"Medios",sub:"índice 7–12",min:7,max:12},
+    {l:"Difíciles",sub:"índice 1–6",min:1,max:6},
+  ];
+  function statsPorIdx(min,max){
+    const hs=hoyos.filter(h=>h.hcpIdx>=min&&h.hcpIdx<=max);
+    if(!hs.length)return null;
+    const n=hs.length;
+    const avgDiff=(hs.reduce((s,h)=>s+h.diff,0)/n).toFixed(2);
+    const avgPutts=(hs.reduce((s,h)=>s+h.putts,0)/n).toFixed(1);
+    const pctBogeyPlus=Math.round(hs.filter(h=>h.diff>=1).length/n*100);
+    const pctParMenos=Math.round(hs.filter(h=>h.diff<=0).length/n*100);
+    return{n,avgDiff,avgPutts,pctBogeyPlus,pctParMenos};
+  }
+
+  // --- POR DISTANCIA DEL HOYO ---
+  const distGrupos=[
+    {l:"Cortos",sub:"hasta 350 yds",min:0,max:350},
+    {l:"Medios",sub:"351–420 yds",min:351,max:420},
+    {l:"Largos",sub:"421+ yds",min:421,max:9999},
+  ];
+  function statsPorDist(min,max){
+    const hs=hoyos.filter(h=>h.dist&&h.dist>=min&&h.dist<=max);
+    if(!hs.length)return null;
+    const n=hs.length;
+    const avgDiff=(hs.reduce((s,h)=>s+h.diff,0)/n).toFixed(2);
+    const avgPutts=(hs.reduce((s,h)=>s+h.putts,0)/n).toFixed(1);
+    const pctBogeyPlus=Math.round(hs.filter(h=>h.diff>=1).length/n*100);
+    return{n,avgDiff,avgPutts,pctBogeyPlus};
+  }
+
+  function colorDiff(d){
+    const v=parseFloat(d);
+    return v<=0?"#8e8":v<=1?"#C9A84C":"#e88";
+  }
+  function labelDiff(d){
+    const v=parseFloat(d);
+    if(v<=-1)return"bajo par";
+    if(v===0)return"par";
+    if(v<=0.5)return"casi par";
+    if(v<=1)return"+1";
+    if(v<=1.5)return"+1.5";
+    return"+"+Math.round(v*10)/10;
+  }
+  function DistBar({dist,n}){
+    const items=[
+      {k:"birdie",label:"Birdie−",col:"#4e8"},
+      {k:"par",label:"Par",col:"#C9A84C"},
+      {k:"bogey",label:"Bogey",col:"#e84"},
+      {k:"doble",label:"Doble",col:"#e44"},
+      {k:"mas",label:"+3",col:"#a22"},
+    ];
+    return(
+      <div style={{display:"flex",gap:"3px",marginTop:"6px",height:"18px",borderRadius:"3px",overflow:"hidden"}}>
+        {items.map(it=>{
+          const pct=Math.round((dist[it.k]||0)/n*100);
+          if(!pct)return null;
+          return<div key={it.k} style={{width:pct+"%",background:it.col,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{fontSize:"9px",color:"#000",fontWeight:"bold"}}>{pct>8?pct+"%":""}</span>
+          </div>;
+        })}
+      </div>
+    );
+  }
+
+  const pares=[3,4,5].map(p=>({p,st:statsPorPar(p)})).filter(x=>x.st);
+  const idxData=grupos.map(g=>({...g,st:statsPorIdx(g.min,g.max)})).filter(x=>x.st);
+  const distData=distGrupos.map(g=>({...g,st:statsPorDist(g.min,g.max)})).filter(x=>x.st);
+
+  return(
+    <div>
+      <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Análisis por tipo de hoyo</div>
+
+      {/* Por par */}
+      <div style={{...S.card,marginBottom:"8px"}}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"12px"}}>Por par</div>
+        {pares.map(({p,st})=>(
+          <div key={p} style={{padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{color:"#f5ead0",fontSize:"14px",fontWeight:"bold"}}>Par {p}</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>{st.n} hoyo{st.n!==1?"s":""} · {st.avgPutts} putts prom</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{color:colorDiff(st.avgDiff),fontSize:"22px",fontWeight:"bold"}}>{st.avgDiff>=0?"+":""}{st.avgDiff.toFixed(2)}</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>{labelDiff(st.avgDiff)}</div>
+              </div>
+            </div>
+            <DistBar dist={st.dist} n={st.n}/>
+          </div>
+        ))}
+      </div>
+
+      {/* Por índice */}
+      {idxData.length>0&&(
+        <div style={{...S.card,marginBottom:"8px"}}>
+          <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"4px"}}>Por dificultad del hoyo</div>
+          <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>Según el índice HCP de cada hoyo</div>
+          {idxData.map(({l,sub,st})=>(
+            <div key={l} style={{padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{color:"#f5ead0",fontSize:"14px",fontWeight:"bold"}}>{l}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>{sub} · {st.n} hoyos</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:colorDiff(st.avgDiff),fontSize:"22px",fontWeight:"bold"}}>{parseFloat(st.avgDiff)>=0?"+":""}{st.avgDiff}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>{st.pctParMenos}% par o mejor</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:"12px",marginTop:"6px"}}>
+                <div style={{background:"#141210",borderRadius:"3px",padding:"4px 8px",textAlign:"center"}}>
+                  <div style={{color:"#8e8",fontSize:"13px",fontWeight:"bold"}}>{st.pctParMenos}%</div>
+                  <div style={{color:"#b09050",fontSize:"9px"}}>par o mejor</div>
+                </div>
+                <div style={{background:"#141210",borderRadius:"3px",padding:"4px 8px",textAlign:"center"}}>
+                  <div style={{color:"#e88",fontSize:"13px",fontWeight:"bold"}}>{st.pctBogeyPlus}%</div>
+                  <div style={{color:"#b09050",fontSize:"9px"}}>bogey o más</div>
+                </div>
+                <div style={{background:"#141210",borderRadius:"3px",padding:"4px 8px",textAlign:"center"}}>
+                  <div style={{color:gold,fontSize:"13px",fontWeight:"bold"}}>{st.avgPutts}</div>
+                  <div style={{color:"#b09050",fontSize:"9px"}}>putts prom</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Por distancia */}
+      {distData.length>0&&(
+        <div style={{...S.card,marginBottom:"8px"}}>
+          <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"4px"}}>Por distancia del hoyo</div>
+          <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>Rendimiento según largo del hoyo</div>
+          {distData.map(({l,sub,st})=>(
+            <div key={l} style={{padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{color:"#f5ead0",fontSize:"14px",fontWeight:"bold"}}>{l}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>{sub} · {st.n} hoyos</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:colorDiff(st.avgDiff),fontSize:"22px",fontWeight:"bold"}}>{parseFloat(st.avgDiff)>=0?"+":""}{st.avgDiff}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>{100-st.pctBogeyPlus}% par o mejor</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:"12px",marginTop:"6px"}}>
+                <div style={{background:"#141210",borderRadius:"3px",padding:"4px 8px",textAlign:"center"}}>
+                  <div style={{color:"#8e8",fontSize:"13px",fontWeight:"bold"}}>{100-st.pctBogeyPlus}%</div>
+                  <div style={{color:"#b09050",fontSize:"9px"}}>par o mejor</div>
+                </div>
+                <div style={{background:"#141210",borderRadius:"3px",padding:"4px 8px",textAlign:"center"}}>
+                  <div style={{color:"#e88",fontSize:"13px",fontWeight:"bold"}}>{st.pctBogeyPlus}%</div>
+                  <div style={{color:"#b09050",fontSize:"9px"}}>bogey o más</div>
+                </div>
+                <div style={{background:"#141210",borderRadius:"3px",padding:"4px 8px",textAlign:"center"}}>
+                  <div style={{color:gold,fontSize:"13px",fontWeight:"bold"}}>{st.avgPutts}</div>
+                  <div style={{color:"#b09050",fontSize:"9px"}}>putts prom</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatsView({rounds,hcp,isCoach}){
   const st=calcStats(rounds);
   if(!st)return <div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>Sin vueltas registradas aún.</div>;
@@ -171,6 +381,7 @@ function StatsView({rounds,hcp,isCoach}){
         <div style={{color:"#b09050",fontSize:"11px"}}>{st.n} vuelta{st.n!==1?"s":""} · {getCat(hcp)} · HCP {hcp}</div>
       </div>
       <GreenStats rounds={rounds}/>
+      <HoleAnalysis rounds={rounds}/>
       {!isCoach&&<div style={{fontSize:"11px",color:"#b09050",textAlign:"center",padding:"10px",background:"#1c1810",borderRadius:"4px"}}>El ranking general lo ve tu coach Adrián.</div>}
     </div>
   );
