@@ -70,6 +70,13 @@ const COURSES=[
   {id:"termas",name:"Termas de Río Hondo Golf",holes:18,par:72,city:"Río Hondo"},
 ];
 
+const PRESET_CONFIGS={
+  "lomas|Lomas Azul":{name:"Lomas Azul",courseId:"lomas",holes:{1:{par:"4",dist:"346",hcpIdx:"11"},2:{par:"3",dist:"157",hcpIdx:"17"},3:{par:"4",dist:"422",hcpIdx:"1"},4:{par:"4",dist:"408",hcpIdx:"9"},5:{par:"3",dist:"180",hcpIdx:"15"},6:{par:"5",dist:"515",hcpIdx:"3"},7:{par:"4",dist:"405",hcpIdx:"7"},8:{par:"4",dist:"351",hcpIdx:"13"},9:{par:"5",dist:"550",hcpIdx:"5"},10:{par:"4",dist:"335",hcpIdx:"14"},11:{par:"4",dist:"382",hcpIdx:"2"},12:{par:"4",dist:"365",hcpIdx:"10"},13:{par:"3",dist:"192",hcpIdx:"16"},14:{par:"5",dist:"456",hcpIdx:"12"},15:{par:"5",dist:"617",hcpIdx:"4"},16:{par:"4",dist:"387",hcpIdx:"8"},17:{par:"3",dist:"138",hcpIdx:"18"},18:{par:"4",dist:"390",hcpIdx:"6"}}},
+  "lomas|Lomas Blanca":{name:"Lomas Blanca",courseId:"lomas",holes:{1:{par:"4",dist:"320",hcpIdx:"11"},2:{par:"3",dist:"141",hcpIdx:"17"},3:{par:"4",dist:"410",hcpIdx:"1"},4:{par:"4",dist:"396",hcpIdx:"9"},5:{par:"3",dist:"166",hcpIdx:"15"},6:{par:"5",dist:"506",hcpIdx:"3"},7:{par:"4",dist:"400",hcpIdx:"7"},8:{par:"4",dist:"327",hcpIdx:"13"},9:{par:"5",dist:"535",hcpIdx:"5"},10:{par:"4",dist:"325",hcpIdx:"14"},11:{par:"4",dist:"372",hcpIdx:"2"},12:{par:"4",dist:"355",hcpIdx:"10"},13:{par:"3",dist:"172",hcpIdx:"16"},14:{par:"5",dist:"443",hcpIdx:"12"},15:{par:"5",dist:"583",hcpIdx:"4"},16:{par:"4",dist:"372",hcpIdx:"8"},17:{par:"3",dist:"123",hcpIdx:"18"},18:{par:"4",dist:"340",hcpIdx:"6"}}},
+  "lomas|Lomas Damas":{name:"Lomas Damas",courseId:"lomas",holes:{1:{par:"4",dist:"297",hcpIdx:"11"},2:{par:"3",dist:"131",hcpIdx:"17"},3:{par:"4",dist:"364",hcpIdx:"1"},4:{par:"4",dist:"360",hcpIdx:"9"},5:{par:"3",dist:"140",hcpIdx:"15"},6:{par:"5",dist:"471",hcpIdx:"3"},7:{par:"4",dist:"346",hcpIdx:"7"},8:{par:"4",dist:"302",hcpIdx:"13"},9:{par:"5",dist:"466",hcpIdx:"5"},10:{par:"4",dist:"310",hcpIdx:"14"},11:{par:"4",dist:"338",hcpIdx:"2"},12:{par:"4",dist:"322",hcpIdx:"10"},13:{par:"3",dist:"133",hcpIdx:"16"},14:{par:"5",dist:"387",hcpIdx:"12"},15:{par:"5",dist:"462",hcpIdx:"4"},16:{par:"4",dist:"334",hcpIdx:"8"},17:{par:"3",dist:"102",hcpIdx:"18"},18:{par:"4",dist:"277",hcpIdx:"6"}}},
+  "cua|CUA":{name:"CUA",courseId:"cua",holes:{1:{par:"3",dist:"50",hcpIdx:"6"},2:{par:"3",dist:"73",hcpIdx:"2"},3:{par:"3",dist:"76",hcpIdx:"1"},4:{par:"3",dist:"64",hcpIdx:"5"},5:{par:"3",dist:"69",hcpIdx:"3"},6:{par:"3",dist:"73",hcpIdx:"4"}}},
+};
+
 const FORMATS_ALL=["Strokeplay","Stableford","Match Play","Fourball","Foursome","Mulligan","Stableford Neto por Hoyo","Fourball Match Play"];
 const FORMATS_A=["Strokeplay","Stableford","Match Play","Fourball","Golpe Alternado","Fourball Match Play"];
 const ZONES=["Caminata","Zona de Reflexión","Zona de Colocación","Zona de Ejecución","Posterior al Golpe"];
@@ -606,7 +613,7 @@ function NewRound({user,onSave,onCancel}){
   const [holes,setHoles]=useState({});
   const [err,setErr]=useState("");
   const [saving,setSaving]=useState(false);
-  const [savedConfigs,setSavedConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
+  const [savedConfigs,setSavedConfigs]=useState(()=>({...PRESET_CONFIGS,...(lsGet("configs:"+user.username)||{})}));
   const [showSaveCfg,setShowSaveCfg]=useState(false);
   const [cfgName,setCfgName]=useState("");
   const course=COURSES.find(c=>c.id===meta.courseId);
@@ -643,7 +650,7 @@ function NewRound({user,onSave,onCancel}){
     Object.entries(holes).forEach(([h,d])=>{holesOnly[h]={par:d.par,dist:d.dist}});
     const configs=lsGet("configs:"+user.username)||{};
     configs[key]={name:cfgName.trim(),courseId:meta.courseId,holes:holesOnly,savedAt:Date.now()};
-    lsSet("configs:"+user.username,configs);setSavedConfigs(configs);setShowSaveCfg(false);
+    lsSet("configs:"+user.username,configs);setSavedConfigs({...PRESET_CONFIGS,...configs});setShowSaveCfg(false);
     alert("✓ Configuración guardada: "+cfgName.trim());
   }
 
@@ -658,7 +665,7 @@ function NewRound({user,onSave,onCancel}){
           <div style={S.h2}>Datos de la vuelta</div>
           {err&&<div style={S.alt("e")}>{err}</div>}
           <label style={S.lbl}>Cancha</label>
-          <select style={{...S.sel,marginBottom:"11px"}} value={meta.courseId} onChange={e=>{setMeta(m=>({...m,courseId:e.target.value,savedConfig:""}));setSavedConfigs(lsGet("configs:"+user.username)||{});}}>
+          <select style={{...S.sel,marginBottom:"11px"}} value={meta.courseId} onChange={e=>{setMeta(m=>({...m,courseId:e.target.value,savedConfig:""}));setSavedConfigs({...PRESET_CONFIGS,...(lsGet("configs:"+user.username)||{})});}}>
             <option value="">Seleccioná una cancha</option>
             {COURSES.map(c=><option key={c.id} value={c.id}>{c.name} — {c.city}</option>)}
           </select>
@@ -1199,7 +1206,7 @@ function MisCanchas({user}){
   const [msg,setMsg]=useState("");
 
   function loadConfig(key){
-    const cfg=configs[key];
+    const cfg=configs[key]||PRESET_CONFIGS[key];
     if(!cfg)return;
     setCourseId(cfg.courseId);
     setCfgName(cfg.name);
@@ -1251,29 +1258,37 @@ function MisCanchas({user}){
     <div style={S.page}>
       <div style={S.h2}>Mis Canchas</div>
 
-      {/* Lista de configs guardadas */}
-      {Object.keys(configs).length>0&&(
-        <div style={{...S.card,marginBottom:"14px"}}>
-          <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Configuraciones guardadas</div>
-          {Object.keys(configs).map(k=>{
-            const cfg=configs[k];
-            const c=COURSES.find(x=>x.id===cfg.courseId);
-            return(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
-                <div style={{flex:1,cursor:"pointer"}} onClick={()=>loadConfig(k)}>
-                  <div style={{color:editKey===k?gold:"#f5ead0",fontSize:"13px",fontWeight:editKey===k?"bold":"normal"}}>{cfg.name}{editKey===k?" ✎":""}</div>
-                  <div style={{color:"#b09050",fontSize:"10px"}}>{c?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div>
+      {/* Lista de configs — presets + propias */}
+      {(()=>{
+        const allKeys=[...Object.keys(PRESET_CONFIGS),...Object.keys(configs)];
+        if(!allKeys.length)return null;
+        return(
+          <div style={{...S.card,marginBottom:"14px"}}>
+            <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Configuraciones disponibles</div>
+            {allKeys.map(k=>{
+              const isPreset=!!PRESET_CONFIGS[k];
+              const cfg=isPreset?PRESET_CONFIGS[k]:configs[k];
+              const c=COURSES.find(x=>x.id===cfg.courseId);
+              return(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+                  <div style={{flex:1,cursor:"pointer"}} onClick={()=>loadConfig(k)}>
+                    <div style={{color:editKey===k?gold:"#f5ead0",fontSize:"13px",fontWeight:editKey===k?"bold":"normal"}}>
+                      {cfg.name}{editKey===k?" ✎":""}
+                      {isPreset&&<span style={{marginLeft:"6px",fontSize:"9px",color:"#6a9a50",border:"1px solid #3a6a2a",borderRadius:"3px",padding:"1px 4px"}}>APP</span>}
+                    </div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>{c?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div>
+                  </div>
+                  <div style={{display:"flex",gap:"6px"}}>
+                    <button style={{...S.btn("g"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>loadConfig(k)}>Ver</button>
+                    {!isPreset&&<button style={{...S.btn("d"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>{if(window.confirm("¿Borrar \""+cfg.name+"\"?"))deleteConfig(k)}}>Borrar</button>}
+                  </div>
                 </div>
-                <div style={{display:"flex",gap:"6px"}}>
-                  <button style={{...S.btn("g"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>loadConfig(k)}>Editar</button>
-                  <button style={{...S.btn("d"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>{if(window.confirm("¿Borrar \""+cfg.name+"\"?"))deleteConfig(k)}}>Borrar</button>
-                </div>
-              </div>
-            );
-          })}
-          <button style={{...S.btn("g"),marginTop:"10px",width:"100%"}} onClick={newConfig}>+ Nueva configuración</button>
-        </div>
-      )}
+              );
+            })}
+            <button style={{...S.btn("g"),marginTop:"10px",width:"100%"}} onClick={newConfig}>+ Nueva configuración</button>
+          </div>
+        );
+      })()}
 
       {/* Editor de config */}
       <div style={S.card}>
@@ -1533,12 +1548,12 @@ function CoachPanel(){
               <div style={{borderTop:"1px solid #5a4a20",marginTop:"14px",paddingTop:"14px"}}>
                 <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Configuraciones de cancha</div>
                 {(()=>{
-                  const cfgs=lsGet("configs:"+selPlayer.user.username)||{};
+                  const cfgs={...PRESET_CONFIGS,...(lsGet("configs:"+selPlayer.user.username)||{})};
                   const keys=Object.keys(cfgs);
-                  if(!keys.length)return <div style={{color:"#b09050",fontSize:"13px"}}>Sin configuraciones guardadas.</div>;
+                  if(!keys.length)return <div style={{color:"#b09050",fontSize:"13px"}}>Sin configuraciones.</div>;
                   return keys.map(k=>{
-                    const cfg=cfgs[k];const course=COURSES.find(c=>c.id===cfg.courseId);
-                    return(<div key={k} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}><div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}</div><div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div></div>);
+                    const cfg=cfgs[k];const course=COURSES.find(c=>c.id===cfg.courseId);const isP=!!PRESET_CONFIGS[k];
+                    return(<div key={k} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}><div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}{isP&&<span style={{marginLeft:"6px",fontSize:"9px",color:"#6a9a50",border:"1px solid #3a6a2a",borderRadius:"3px",padding:"1px 4px"}}>APP</span>}</div><div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div></div>);
                   });
                 })()}
               </div>
