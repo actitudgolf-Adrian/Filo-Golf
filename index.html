@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="theme-color" content="#1a1612"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Filo Golf"/>
+<title>Filo Golf</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%231a1612'/><text y='78' x='50' text-anchor='middle' font-size='75' fill='%23C9A84C'>φ</text></svg>"/>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a1612'/><text y='78' x='50' text-anchor='middle' font-size='75' fill='%23C9A84C'>φ</text></svg>"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0d0a;font-family:Georgia,'Times New Roman',serif;color:#f5ead0}
+input,select,textarea{font-family:Georgia,'Times New Roman',serif}
+input[type=number]::-webkit-inner-spin-button{opacity:1}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo}=React;
+const gold="#C9A84C";
+
+const SB_URL="https://qrkxzgwycuvtirlurmec.supabase.co";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFya3h6Z3d5Y3V2dGlybHVybWVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNzU2MDksImV4cCI6MjA5OTc1MTYwOX0.B7yIQMSW6u8O7P6IsDaTdqk1IxFU3nSkngVx2lmaSMs";
+const H={"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates"};
+
+async function sbQ(path){try{const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H});if(!r.ok)return[];return await r.json();}catch{return[]}}
+async function sbU(table,data){try{const r=await fetch(SB_URL+"/rest/v1/"+table,{method:"POST",headers:H,body:JSON.stringify(data)});return r.ok;}catch{return false}}
+async function sbPatch(table,match,data){try{const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");const r=await fetch(SB_URL+"/rest/v1/"+table+"?"+q,{method:"PATCH",headers:H,body:JSON.stringify(data)});return r.ok;}catch{return false}}
+async function sbD(table,match){try{const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");const r=await fetch(SB_URL+"/rest/v1/"+table+"?"+q,{method:"DELETE",headers:H});return r.ok;}catch{return false}}
+
+function lsGet(k){try{const v=localStorage.getItem("fg_"+k);return v?JSON.parse(v):null}catch{return null}}
+function lsSet(k,v){try{localStorage.setItem("fg_"+k,JSON.stringify(v));return true}catch{return false}}
+
+const INVITE="ACTITUDGOLF",COACH_U="coach",COACH_P="FILOCOCOACH";
+
+const COURSES=[
+  {id:"arelauquen",name:"Arelauquen Golf & CC",holes:18,par:72,city:"Bariloche"},
+  {id:"cabezacaballo",name:"Cabeza de Caballo",holes:18,par:72,city:"Ezeiza"},
+  {id:"carilo",name:"Cariló Golf Club",holes:18,par:70,city:"Cariló"},
+  {id:"hindu",name:"Club Hindú",holes:18,par:72,city:"Don Torcuato"},
+  {id:"mitre",name:"Club Mitre",holes:18,par:72,city:"San Martín"},
+  {id:"sanmartin",name:"Club San Martín",holes:18,par:72,city:"Tres de Febrero"},
+  {id:"cua",name:"CUA (campo de práctica)",holes:6,par:18,city:"Buenos Aires"},
+  {id:"elsosiego",name:"El Sosiego",holes:18,par:72,city:"Canning"},
+  {id:"elvenado",name:"El Venado",holes:18,par:72,city:"Canning"},
+  {id:"elombu",name:"El Ombú",holes:18,par:72,city:"Ezeiza"},
+  {id:"fincassanvicente",name:"Fincas de San Vicente",holes:18,par:72,city:"San Vicente"},
+  {id:"gcba",name:"Golf Club Buenos Aires",holes:18,par:72,city:"Buenos Aires"},
+  {id:"hurlingham",name:"Hurlingham Club",holes:18,par:72,city:"Hurlingham"},
+  {id:"jockey",name:"Jockey Club",holes:18,par:72,city:"San Isidro"},
+  {id:"laprovidencia",name:"La Providencia",holes:18,par:72,city:"Ezeiza / Canning"},
+  {id:"canuelas",name:"Las Cañuelas Club de Campo",holes:18,par:72,city:"Las Cañuelas"},
+  {id:"llaollao",name:"Llao Llao Golf Club",holes:18,par:71,city:"Bariloche"},
+  {id:"lobos",name:"Lobos Golf Club",holes:18,par:72,city:"Lobos"},
+  {id:"lomas",name:"Lomas Athletic Club",holes:18,par:72,city:"Lomas de Zamora"},
+  {id:"mdp",name:"Mar del Plata Golf Club",holes:18,par:72,city:"Mar del Plata"},
+  {id:"montermos",name:"Montermos Golf Club",holes:18,par:72,city:"Monte Hermoso"},
+  {id:"olivos",name:"Olivos Golf Club",holes:18,par:71,city:"Olivos"},
+  {id:"potrerillos",name:"Potrerillos de Larreta",holes:18,par:72,city:"Córdoba"},
+  {id:"sanandres",name:"San Andrés Golf Club",holes:18,par:72,city:"San Andrés"},
+  {id:"santateresita",name:"Santa Teresita Golf",holes:9,par:36,city:"Santa Teresita"},
+  {id:"termas",name:"Termas de Río Hondo Golf",holes:18,par:72,city:"Río Hondo"},
+];
+
+const PRESET_CONFIGS={
+  "lomas|Lomas Azul":{name:"Lomas Azul",courseId:"lomas",holes:{1:{par:"4",dist:"346",hcpIdx:"11"},2:{par:"3",dist:"157",hcpIdx:"17"},3:{par:"4",dist:"422",hcpIdx:"1"},4:{par:"4",dist:"408",hcpIdx:"9"},5:{par:"3",dist:"180",hcpIdx:"15"},6:{par:"5",dist:"515",hcpIdx:"3"},7:{par:"4",dist:"405",hcpIdx:"7"},8:{par:"4",dist:"351",hcpIdx:"13"},9:{par:"5",dist:"550",hcpIdx:"5"},10:{par:"4",dist:"335",hcpIdx:"14"},11:{par:"4",dist:"382",hcpIdx:"2"},12:{par:"4",dist:"365",hcpIdx:"10"},13:{par:"3",dist:"192",hcpIdx:"16"},14:{par:"5",dist:"456",hcpIdx:"12"},15:{par:"5",dist:"617",hcpIdx:"4"},16:{par:"4",dist:"387",hcpIdx:"8"},17:{par:"3",dist:"138",hcpIdx:"18"},18:{par:"4",dist:"390",hcpIdx:"6"}}},
+  "lomas|Lomas Blanca":{name:"Lomas Blanca",courseId:"lomas",holes:{1:{par:"4",dist:"320",hcpIdx:"11"},2:{par:"3",dist:"141",hcpIdx:"17"},3:{par:"4",dist:"410",hcpIdx:"1"},4:{par:"4",dist:"396",hcpIdx:"9"},5:{par:"3",dist:"166",hcpIdx:"15"},6:{par:"5",dist:"506",hcpIdx:"3"},7:{par:"4",dist:"400",hcpIdx:"7"},8:{par:"4",dist:"327",hcpIdx:"13"},9:{par:"5",dist:"535",hcpIdx:"5"},10:{par:"4",dist:"325",hcpIdx:"14"},11:{par:"4",dist:"372",hcpIdx:"2"},12:{par:"4",dist:"355",hcpIdx:"10"},13:{par:"3",dist:"172",hcpIdx:"16"},14:{par:"5",dist:"443",hcpIdx:"12"},15:{par:"5",dist:"583",hcpIdx:"4"},16:{par:"4",dist:"372",hcpIdx:"8"},17:{par:"3",dist:"123",hcpIdx:"18"},18:{par:"4",dist:"340",hcpIdx:"6"}}},
+  "lomas|Lomas Damas":{name:"Lomas Damas",courseId:"lomas",holes:{1:{par:"4",dist:"297",hcpIdx:"11"},2:{par:"3",dist:"131",hcpIdx:"17"},3:{par:"4",dist:"364",hcpIdx:"1"},4:{par:"4",dist:"360",hcpIdx:"9"},5:{par:"3",dist:"140",hcpIdx:"15"},6:{par:"5",dist:"471",hcpIdx:"3"},7:{par:"4",dist:"346",hcpIdx:"7"},8:{par:"4",dist:"302",hcpIdx:"13"},9:{par:"5",dist:"466",hcpIdx:"5"},10:{par:"4",dist:"310",hcpIdx:"14"},11:{par:"4",dist:"338",hcpIdx:"2"},12:{par:"4",dist:"322",hcpIdx:"10"},13:{par:"3",dist:"133",hcpIdx:"16"},14:{par:"5",dist:"387",hcpIdx:"12"},15:{par:"5",dist:"462",hcpIdx:"4"},16:{par:"4",dist:"334",hcpIdx:"8"},17:{par:"3",dist:"102",hcpIdx:"18"},18:{par:"4",dist:"277",hcpIdx:"6"}}},
+  "cua|CUA":{name:"CUA",courseId:"cua",holes:{1:{par:"3",dist:"50",hcpIdx:"6"},2:{par:"3",dist:"73",hcpIdx:"2"},3:{par:"3",dist:"76",hcpIdx:"1"},4:{par:"3",dist:"64",hcpIdx:"5"},5:{par:"3",dist:"69",hcpIdx:"3"},6:{par:"3",dist:"73",hcpIdx:"4"}}},
+};
+
+const FORMATS_ALL=["Strokeplay","Stableford","Match Play","Fourball","Foursome","Mulligan","Stableford Neto por Hoyo","Fourball Match Play"];
+const FORMATS_A=["Strokeplay","Stableford","Match Play","Fourball","Golpe Alternado","Fourball Match Play"];
+const ZONES=["Caminata","Zona de Reflexión","Zona de Colocación","Zona de Ejecución","Posterior al Golpe"];
+
+function getCat(h){h=parseFloat(h)||0;if(h<=12)return"A (0-12)";if(h<=24)return"B (13-24)";if(h<=36)return"C (25-36)";return"D (37-54)"}
+
+const S={
+  app:{minHeight:"100vh",background:"#0f0d0a",color:"#f5ead0"},
+  hdr:{background:"linear-gradient(135deg,#1a1612,#2d2218)",borderBottom:"1px solid #8B6914",padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"},
+  page:{maxWidth:"860px",margin:"0 auto",padding:"18px 14px"},
+  card:{background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"6px",padding:"16px",marginBottom:"12px"},
+  h2:{fontSize:"15px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"14px",borderBottom:"1px solid #3a3020",paddingBottom:"7px"},
+  inp:{background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",color:"#f5ead0",padding:"9px 11px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none"},
+  sel:{background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",color:"#f5ead0",padding:"9px 11px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none"},
+  btn:v=>({background:v==="p"?`linear-gradient(135deg,${gold},#a8822a)`:v==="d"?"#5a1a1a":"#2d2720",color:v==="p"?"#1a1612":"#f5ead0",border:v==="g"?"1px solid #7a6030":"none",borderRadius:"4px",padding:"9px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold"}),
+  nb:a=>({background:a?gold:"transparent",color:a?"#1a1612":gold,border:`1px solid ${gold}`,borderRadius:"3px",padding:"5px 11px",fontSize:"10px",letterSpacing:"1.5px",textTransform:"uppercase",cursor:"pointer"}),
+  lbl:{fontSize:"11px",color:"#b09050",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px"},
+  alt:t=>({background:t==="e"?"#3a1010":"#1a2a1a",border:`1px solid ${t==="e"?"#7a2020":"#2a5a2a"}`,borderRadius:"4px",padding:"9px 13px",fontSize:"13px",color:t==="e"?"#e88":"#8e8",marginBottom:"12px"}),
+};
+
+function StatCard({label,value,sub}){
+  return(
+    <div style={{...S.card,textAlign:"center",padding:"14px"}}>
+      <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>{label}</div>
+      <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{value}</div>
+      {sub&&<div style={{color:"#b09050",fontSize:"10px",marginTop:"3px"}}>{sub}</div>}
+    </div>
+  );
+}
+
+function calcStats(rounds){
+  if(!rounds.length)return null;
+  const n=rounds.length;
+  const totalHoles=rounds.reduce((s,r)=>s+Object.keys(r.holes||{}).length,0);
+  const avgGross=(rounds.reduce((s,r)=>s+(r.totalShots||0),0)/n).toFixed(1);
+  const avgNeto=(rounds.reduce((s,r)=>s+((r.totalShots||0)-(r.hcp||0)),0)/n).toFixed(1);
+  const best=Math.min(...rounds.map(r=>r.totalShots||999));
+  const bestNeto=Math.min(...rounds.map(r=>(r.totalShots||0)-(r.hcp||0)));
+  const totalPutts=rounds.reduce((s,r)=>s+(r.totalPutts||0),0);
+  const totalChips=rounds.reduce((s,r)=>s+(r.totalChips||0),0);
+  const totalBunker=rounds.reduce((s,r)=>s+(r.totalBunker||0),0);
+  const avgPutts=(totalPutts/n).toFixed(1);
+  const avgPuttsH=totalHoles?(totalPutts/totalHoles).toFixed(2):"—";
+  const avgChips=(totalChips/n).toFixed(1);
+  const avgChipsH=totalHoles?(totalChips/totalHoles).toFixed(2):"—";
+  const avgBunker=(totalBunker/n).toFixed(1);
+  const avgBunkerH=totalHoles?(totalBunker/totalHoles).toFixed(2):"—";
+  // Dist. primer putt
+  const dp1vals=[];
+  rounds.forEach(r=>Object.values(r.holes||{}).forEach(h=>{const v=parseFloat(h.distPutt1);if(v>0)dp1vals.push(v);}));
+  const avgDistPutt1=dp1vals.length?(dp1vals.reduce((a,b)=>a+b,0)/dp1vals.length).toFixed(1):"—";
+  // Dist. total recorrida pateando por vuelta (suma distPutt1 de cada vuelta, promedio entre vueltas)
+  const dp1PerRound=rounds.map(r=>{
+    let s=0;Object.values(r.holes||{}).forEach(h=>{const v=parseFloat(h.distPutt1);if(v>0)s+=v;});return s;
+  }).filter(v=>v>0);
+  const avgDistPutt1Round=dp1PerRound.length?(dp1PerRound.reduce((a,b)=>a+b,0)/dp1PerRound.length).toFixed(1):"—";
+  return{n,avgGross,avgNeto,best,bestNeto,avgPutts,avgPuttsH,avgChips,avgChipsH,avgBunker,avgBunkerH,avgDistPutt1,dp1count:dp1vals.length,avgDistPutt1Round,dp1RoundCount:dp1PerRound.length};
+}
+
+function StatsView({rounds,hcp,isCoach}){
+  const st=calcStats(rounds);
+  if(!st)return <div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>Sin vueltas registradas aún.</div>;
+  return(
+    <div>
+      <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>Score</div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. GROSS" value={st.avgGross} sub={"mejor: "+(st.best===999?"—":st.best)}/>
+        <StatCard label="PROM. NETO" value={st.avgNeto} sub={"mejor: "+st.bestNeto}/>
+      </div>
+      <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Putting</div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. PUTTS/RONDA" value={st.avgPutts}/>
+        <StatCard label="PROM. PUTTS/HOYO" value={st.avgPuttsH}/>
+      </div>
+      {st.dp1count>0&&(
+        <div style={{...S.g2,marginBottom:"8px"}}>
+          <StatCard label="DIST. PROM. PRIMER PUTT" value={st.avgDistPutt1+" yds"} sub={st.dp1count+" hoyo"+(st.dp1count!==1?"s":"")+" registrado"+(st.dp1count!==1?"s":"")}/>
+          <StatCard label="DIST. PROM. RECORRIDA/VUELTA" value={st.avgDistPutt1Round+" yds"} sub={st.dp1RoundCount+" vuelta"+(st.dp1RoundCount!==1?"s":"")}/>
+        </div>
+      )}
+      <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Juego corto</div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. CHIPS/RONDA" value={st.avgChips}/>
+        <StatCard label="PROM. CHIPS/HOYO" value={st.avgChipsH}/>
+      </div>
+      <div style={{...S.g2,marginBottom:"8px"}}>
+        <StatCard label="PROM. BÚNKER/RONDA" value={st.avgBunker}/>
+        <StatCard label="PROM. BÚNKER/HOYO" value={st.avgBunkerH}/>
+      </div>
+      <div style={{...S.card,textAlign:"center",padding:"12px"}}>
+        <div style={{color:"#b09050",fontSize:"11px"}}>{st.n} vuelta{st.n!==1?"s":""} · {getCat(hcp)} · HCP {hcp}</div>
+      </div>
+      <GreenStats rounds={rounds}/>
+      {!isCoach&&<div style={{fontSize:"11px",color:"#b09050",textAlign:"center",padding:"10px",background:"#1c1810",borderRadius:"4px"}}>El ranking general lo ve tu coach Adrián.</div>}
+    </div>
+  );
+}
+
+const RANGOS=[{l:"hasta 50",min:0,max:50},{l:"51-80",min:51,max:80},{l:"81-110",min:81,max:110},{l:"111-135",min:111,max:135},{l:"136-150",min:136,max:150},{l:"151-165",min:151,max:165},{l:"166-180",min:166,max:180},{l:"181-195",min:181,max:195},{l:"196-210",min:196,max:210},{l:"211+",min:211,max:9999}];
+
+function GreenStats({rounds}){
+  const [filtMin,setFiltMin]=useState("");
+  const [filtMax,setFiltMax]=useState("");
+
+  // Collect all shots with yards data (supports tirosGreen[] new format and legacy yards/palo)
+  const shots=[];
+  rounds.forEach(r=>{
+    Object.values(r.holes||{}).forEach(h=>{
+      if(!parseInt(h.shots))return; // hoyo no jugado
+      const isPar3=parseInt(h.par)===3;
+      const putts=parseInt(h.putts)||0;
+      const chips=parseInt(h.chips)||0;
+      const bunker=parseInt(h.bunker)||0;
+      const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+      if(tirosG){
+        // New format: multiple tiros per hole
+        tirosG.forEach(t=>{
+          const yds=parseInt(t.dist)||(isPar3?parseInt(h.dist):0);
+          if(!yds)return;
+          const resultado=t.resultado||"";
+          shots.push({
+            yds,
+            palo:(t.palo||"").trim().toUpperCase()||"—",
+            putts,chips,bunker,
+            enGreen:resultado==="green"
+          });
+        });
+      }else{
+        // Legacy format: single yards/palo on hole
+        const yds=parseInt(h.yards)||(isPar3?parseInt(h.dist):0);
+        if(!yds)return;
+        shots.push({
+          yds,
+          palo:(h.palo||"").trim().toUpperCase()||"—",
+          putts,chips,bunker,
+          enGreen:putts>0&&chips===0&&bunker===0
+        });
+      }
+    });
+  });
+
+  if(!shots.length)return null;
+
+  const avgDist=(shots.reduce((s,h)=>s+h.yds,0)/shots.length).toFixed(0);
+
+  // Filter
+  const fMin=filtMin?parseInt(filtMin):null;
+  const fMax=filtMax?parseInt(filtMax):null;
+  const filtered=shots.filter(s=>(fMin===null||s.yds>=fMin)&&(fMax===null||s.yds<=fMax));
+
+  // By range
+  function rangeStats(min,max){
+    const rs=shots.filter(s=>s.yds>=min&&s.yds<=max);
+    if(!rs.length)return null;
+    const greens=rs.filter(s=>s.enGreen).length;
+    const palos={};
+    rs.forEach(s=>{if(s.palo!=="—"){palos[s.palo]=(palos[s.palo]||0)+1;}});
+    const topPalo=Object.entries(palos).sort((a,b)=>b[1]-a[1])[0];
+    return{n:rs.length,pct:Math.round(greens/rs.length*100),topPalo:topPalo?topPalo[0]:null};
+  }
+
+  // Filtered stats
+  const fGreens=filtered.length?filtered.filter(s=>s.enGreen).length:0;
+  const fPalos={};
+  filtered.forEach(s=>{if(s.palo!=="—")fPalos[s.palo]=(fPalos[s.palo]||0)+1;});
+  const fTopPalos=Object.entries(fPalos).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  return(
+    <div>
+      <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px",marginTop:"6px"}}>Tiro al green</div>
+      <div style={{...S.card,textAlign:"center",padding:"14px",marginBottom:"8px"}}>
+        <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"2px",marginBottom:"4px"}}>PROMEDIO DISTANCIA DE ATAQUE</div>
+        <div style={{color:gold,fontSize:"34px",fontWeight:"bold"}}>{avgDist} <span style={{fontSize:"16px"}}>yds</span></div>
+        <div style={{color:"#b09050",fontSize:"11px",marginTop:"4px"}}>sobre {shots.length} tiro{shots.length!==1?"s":""} registrado{shots.length!==1?"s":""}</div>
+      </div>
+
+      <div style={{...S.card,marginBottom:"8px"}}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Por rango de distancia</div>
+        {RANGOS.map(rng=>{
+          const rs=rangeStats(rng.min,rng.max);
+          if(!rs)return null;
+          return(
+            <div key={rng.l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #3a3020"}}>
+              <div>
+                <div style={{color:"#f5ead0",fontSize:"13px"}}>{rng.l} yds</div>
+                {rs.topPalo&&<div style={{color:"#b09050",fontSize:"10px"}}>palo más usado: {rs.topPalo}</div>}
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{color:gold,fontSize:"16px",fontWeight:"bold"}}>{rs.pct}%</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>{rs.n} tiro{rs.n!==1?"s":""} · greens</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {(()=>{
+        // Golpes perdidos atacando greens: por cada hoyo, cantidad de tiros al green - 1 = golpes perdidos
+        // Se acumula por vuelta para mostrar evolución y promedio total
+        const gpRondas=[];
+        rounds.forEach(r=>{
+          let gpRonda=0;let hoyosConDato=0;
+          Object.values(r.holes||{}).forEach(h=>{
+            if(!parseInt(h.shots))return;
+            const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+            // Solo contar hoyos con datos de tiro al green
+            if(tirosG){
+              const perdidos=tirosG.length-1; // 1 tiro = 0 perdidos, 2 tiros = 1 perdido, etc.
+              gpRonda+=perdidos;hoyosConDato++;
+            }else if(h.yards||h.palo){
+              // legacy: single shot, 0 perdidos (no podemos saber si hubo varios)
+              hoyosConDato++;
+            }
+          });
+          if(hoyosConDato>0)gpRondas.push({fecha:r.date||r.created_at||"",numHoles:r.numHoles||18,gp:gpRonda,hoyos:hoyosConDato});
+        });
+        if(!gpRondas.length)return null;
+        const totalGP=gpRondas.reduce((s,r)=>s+r.gp,0);
+        const totalHoyos=gpRondas.reduce((s,r)=>s+r.hoyos,0);
+        const promGP=(totalGP/gpRondas.length).toFixed(1);
+        const promGPHoyo=(totalGP/totalHoyos).toFixed(2);
+        const colorGP=parseFloat(promGP)<=1?"#8e8":parseFloat(promGP)<=3?"#C9A84C":"#e88";
+        // Por rango — golpes perdidos según distancia del primer tiro
+        const gpRango={};
+        rounds.forEach(r=>{
+          Object.values(r.holes||{}).forEach(h=>{
+            if(!parseInt(h.shots))return;
+            const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+            if(!tirosG||tirosG.length===0)return;
+            const isPar3h=parseInt(h.par)===3;
+            const yds=parseInt(tirosG[0].dist)||(isPar3h?parseInt(h.dist):0);
+            if(!yds)return;
+            const perdidos=tirosG.length-1;
+            const rng=RANGOS.find(rr=>yds>=rr.min&&yds<=rr.max);
+            if(!rng)return;
+            if(!gpRango[rng.l])gpRango[rng.l]={total:0,n:0};
+            gpRango[rng.l].total+=perdidos;gpRango[rng.l].n++;
+          });
+        });
+        const rangosGP=RANGOS.filter(r=>gpRango[r.l]);
+        return(
+          <div style={{...S.card,marginBottom:"8px"}}>
+            <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Golpes perdidos atacando greens</div>
+            <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>Cada tiro extra hasta llegar a green, chip o búnker cuenta como un golpe perdido</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"12px"}}>
+              <div style={{...S.card,textAlign:"center",padding:"12px",background:"#141210"}}>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",marginBottom:"4px"}}>PROM. POR VUELTA</div>
+                <div style={{color:colorGP,fontSize:"30px",fontWeight:"bold"}}>{promGP}</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>golpes</div>
+              </div>
+              <div style={{...S.card,textAlign:"center",padding:"12px",background:"#141210"}}>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",marginBottom:"4px"}}>PROM. POR HOYO</div>
+                <div style={{color:colorGP,fontSize:"30px",fontWeight:"bold"}}>{promGPHoyo}</div>
+                <div style={{color:"#b09050",fontSize:"10px"}}>golpes</div>
+              </div>
+            </div>
+            {rangosGP.length>0&&(
+              <div style={{marginBottom:"12px"}}>
+                <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Por distancia de ataque</div>
+                {rangosGP.map(rng=>{
+                  const d=gpRango[rng.l];
+                  const avg=(d.total/d.n).toFixed(2);
+                  const avgN=parseFloat(avg);
+                  const col=avgN<=0.3?"#8e8":avgN<=0.8?"#C9A84C":"#e88";
+                  return(
+                    <div key={rng.l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #3a3020"}}>
+                      <div style={{color:"#f5ead0",fontSize:"13px"}}>{rng.l} yds</div>
+                      <div style={{textAlign:"right"}}>
+                        <span style={{color:col,fontSize:"18px",fontWeight:"bold"}}>{avg}</span>
+                        <span style={{color:"#b09050",fontSize:"10px",marginLeft:"5px"}}>golpes prom · {d.n} hoyos</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div>
+              <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Evolución por vuelta</div>
+              {gpRondas.slice().reverse().map((r,i)=>{
+                const col=r.gp===0?"#8e8":r.gp<=2?"#C9A84C":"#e88";
+                const fecha=r.fecha?new Date(r.fecha).toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}):"";
+                const barW=Math.min(100,r.gp/Math.max(...gpRondas.map(x=>x.gp))*100||0);
+                return(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:"8px",padding:"5px 0",borderBottom:"1px solid #2a2010"}}>
+                    <div style={{color:"#b09050",fontSize:"10px",minWidth:"36px"}}>{fecha}</div>
+                    <div style={{flex:1,height:"12px",background:"#1a1612",borderRadius:"2px",overflow:"hidden"}}>
+                      <div style={{width:barW+"%",height:"100%",background:col,borderRadius:"2px",transition:"width 0.3s"}}/>
+                    </div>
+                    <div style={{color:col,fontSize:"14px",fontWeight:"bold",minWidth:"24px",textAlign:"right"}}>{r.gp}</div>
+                    <div style={{color:"#b09050",fontSize:"9px",minWidth:"28px"}}>{r.numHoles}h</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      <div style={{...S.card,marginBottom:"8px"}}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Golpes para terminar el hoyo</div>
+        <div style={{color:"#b09050",fontSize:"10px",marginBottom:"10px"}}>Tiro al green + chips + búnker + putts</div>
+        {(()=>{
+          const costoMap={};
+          rounds.forEach(r=>{
+            Object.values(r.holes||{}).forEach(h=>{
+              if(!parseInt(h.shots))return;
+              const isPar3h=parseInt(h.par)===3;
+              const putts=parseInt(h.putts)||0;
+              const chips=parseInt(h.chips)||0;
+              const bunker=parseInt(h.bunker)||0;
+              if(putts===0)return; // sin putts no sabemos si terminó
+              const tirosG=h.tirosGreen&&h.tirosGreen.length>0?h.tirosGreen:null;
+              const yds=tirosG
+                ?parseInt(tirosG[0].dist)||(isPar3h?parseInt(h.dist):0)
+                :parseInt(h.yards)||(isPar3h?parseInt(h.dist):0);
+              if(!yds)return;
+              const costo=1+chips+bunker+putts;
+              const rng=RANGOS.find(r=>yds>=r.min&&yds<=r.max);
+              if(!rng)return;
+              if(!costoMap[rng.l])costoMap[rng.l]={total:0,n:0,dist:{1:0,2:0,3:0,4:0,5:0,6:0}};
+              costoMap[rng.l].total+=costo;
+              costoMap[rng.l].n++;
+              const k=Math.min(costo,6);
+              costoMap[rng.l].dist[k]=(costoMap[rng.l].dist[k]||0)+1;
+            });
+          });
+          const rangosConDatos=RANGOS.filter(r=>costoMap[r.l]);
+          if(!rangosConDatos.length)return <div style={{color:"#b09050",fontSize:"12px"}}>Sin datos suficientes aún.</div>;
+          return rangosConDatos.map(rng=>{
+            const d=costoMap[rng.l];
+            const avg=(d.total/d.n).toFixed(1);
+            const avgNum=parseFloat(avg);
+            const colorAvg=avgNum<=3?"#8e8":avgNum<=4?"#C9A84C":"#e88";
+            return(
+              <div key={rng.l} style={{padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
+                  <div style={{color:"#f5ead0",fontSize:"13px"}}>{rng.l} yds</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:"5px"}}>
+                    <span style={{color:colorAvg,fontSize:"20px",fontWeight:"bold"}}>{avg}</span>
+                    <span style={{color:"#b09050",fontSize:"10px"}}>golpes prom · {d.n} tiro{d.n!==1?"s":""}</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:"4px"}}>
+                  {[2,3,4,5,6].map(k=>{
+                    const cnt=d.dist[k]||0;
+                    if(!cnt)return null;
+                    const pct=Math.round(cnt/d.n*100);
+                    const col=k<=3?"#8e8":k===4?"#C9A84C":"#e88";
+                    return(
+                      <div key={k} style={{background:"#141210",border:`1px solid ${col}`,borderRadius:"3px",padding:"3px 6px",textAlign:"center",minWidth:"36px"}}>
+                        <div style={{color:col,fontSize:"13px",fontWeight:"bold"}}>{k===6?"6+":k}</div>
+                        <div style={{color:"#b09050",fontSize:"9px"}}>{pct}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          });
+        })()}
+      </div>
+
+      <div style={S.card}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Por palo</div>
+        {(()=>{
+          // Agrupar tiros por palo
+          const paloMap={};
+          shots.forEach(s=>{
+            if(s.palo==="—")return;
+            if(!paloMap[s.palo])paloMap[s.palo]={tiros:[],greens:0,chips:0,bunkers:0};
+            paloMap[s.palo].tiros.push(s.yds);
+            if(s.enGreen)paloMap[s.palo].greens++;
+            if(s.chips>0)paloMap[s.palo].chips++;
+            if(s.bunker>0)paloMap[s.palo].bunkers++;
+          });
+          const palosOrdenados=Object.entries(paloMap).sort((a,b)=>{
+            const avgA=a[1].tiros.reduce((x,y)=>x+y,0)/a[1].tiros.length;
+            const avgB=b[1].tiros.reduce((x,y)=>x+y,0)/b[1].tiros.length;
+            return avgA-avgB;
+          });
+          if(!palosOrdenados.length)return <div style={{color:"#b09050",fontSize:"12px"}}>Sin datos de palo registrados aún.</div>;
+          return(
+            <div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 60px 70px 44px 36px 36px",gap:"4px",marginBottom:"6px",paddingBottom:"5px",borderBottom:"1px solid #5a4a20"}}>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase"}}>PALO</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>YDS</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>RANGO</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>GRN%</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>CHI</div>
+                <div style={{color:"#b09050",fontSize:"9px",letterSpacing:"1px",textTransform:"uppercase",textAlign:"center"}}>BNK</div>
+              </div>
+              {palosOrdenados.map(([palo,d])=>{
+                const n=d.tiros.length;
+                const avg=Math.round(d.tiros.reduce((x,y)=>x+y,0)/n);
+                const mn=Math.min(...d.tiros);
+                const mx=Math.max(...d.tiros);
+                const pctG=Math.round(d.greens/n*100);
+                const pctC=Math.round(d.chips/n*100);
+                const pctB=Math.round(d.bunkers/n*100);
+                return(
+                  <div key={palo} style={{display:"grid",gridTemplateColumns:"1fr 60px 70px 44px 36px 36px",gap:"4px",padding:"7px 0",borderBottom:"1px solid #3a3020",alignItems:"center"}}>
+                    <div>
+                      <div style={{color:"#f5ead0",fontSize:"13px",fontWeight:"bold"}}>{palo}</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>{n} tiro{n!==1?"s":""}</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{avg}</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>prom</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:"#f5ead0",fontSize:"11px"}}>{mn===mx?mn:mn+"–"+mx}</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>yds</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:pctG>=50?"#8e8":pctG>=30?"#aa8":gold,fontSize:"14px",fontWeight:"bold"}}>{pctG}%</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>grn</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:"#f5ead0",fontSize:"13px"}}>{pctC}%</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>chi</div>
+                    </div>
+                    <div style={{textAlign:"center"}}>
+                      <div style={{color:"#f5ead0",fontSize:"13px"}}>{pctB}%</div>
+                      <div style={{color:"#b09050",fontSize:"9px"}}>bnk</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+
+      <div style={S.card}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Filtro libre</div>
+        <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"10px"}}>
+          <input style={{...S.inp,textAlign:"center"}} type="number" placeholder="desde" value={filtMin} onChange={e=>setFiltMin(e.target.value)}/>
+          <span style={{color:"#b09050"}}>—</span>
+          <input style={{...S.inp,textAlign:"center"}} type="number" placeholder="hasta" value={filtMax} onChange={e=>setFiltMax(e.target.value)}/>
+          <span style={{color:"#b09050",fontSize:"11px",whiteSpace:"nowrap"}}>yds</span>
+        </div>
+        {filtered.length>0?(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"8px"}}>
+              <div style={{color:"#b09050",fontSize:"12px"}}>{filtered.length} tiro{filtered.length!==1?"s":""}</div>
+              <div style={{color:gold,fontSize:"16px",fontWeight:"bold"}}>{Math.round(fGreens/filtered.length*100)}% greens</div>
+            </div>
+            {fTopPalos.length>0&&(
+              <div>
+                <div style={{color:"#b09050",fontSize:"10px",marginBottom:"6px"}}>Palos más usados en este rango:</div>
+                {fTopPalos.map(([palo,cnt])=>(
+                  <div key={palo} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #3a3020"}}>
+                    <span style={{color:"#f5ead0",fontSize:"13px"}}>{palo}</span>
+                    <span style={{color:"#b09050",fontSize:"12px"}}>{cnt} vez{cnt!==1?"es":""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ):<div style={{color:"#b09050",fontSize:"12px"}}>Ingresá un rango para filtrar.</div>}
+      </div>
+    </div>
+  );
+}
+
+function Auth({onLogin}){
+  const [mode,setMode]=useState("login");
+  const [f,setF]=useState({user:"",pass:"",code:"",name:"",hcp:"18",hcpT:"libre"});
+  const [err,setErr]=useState("");
+  const [busy,setBusy]=useState(false);
+  const upd=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  async function login(){
+    setErr("");setBusy(true);
+    try{
+      const u=f.user.trim().toLowerCase();
+      if(u===COACH_U&&f.pass===COACH_P){
+        const c={username:"coach",name:"Adrián Mamianetti",isCoach:true};
+        lsSet("session",c);onLogin(c);return;
+      }
+      const rows=await sbQ(`users?username=eq.${u}&limit=1`);
+      const sb=rows&&rows[0];
+      const local=lsGet("user:"+u);
+      const s=sb||local;
+      if(!s){setErr("Usuario no encontrado.");return}
+      const pass=(sb&&sb.pass)||lsGet("pass:"+u)||s.pass;
+      if(pass!==f.pass){setErr("Contraseña incorrecta.");return}
+      const ud={username:s.username,name:s.name,hcp:s.hcp||18,hcpT:s.hcpt||s.hcpT||"libre",isCoach:false};
+      lsSet("session",ud);lsSet("pass:"+u,f.pass);onLogin(ud);
+    }catch(e){setErr("Error de conexión.");}
+    finally{setBusy(false);}
+  }
+
+  async function register(){
+    setErr("");setBusy(true);
+    try{
+      if(f.code.trim().toUpperCase()!==INVITE){setErr("Código de invitación inválido.");return}
+      if(!f.user.trim()||!f.pass||!f.name.trim()){setErr("Completá todos los campos.");return}
+      const u=f.user.trim().toLowerCase().replace(/\s/g,"");
+      if(u===COACH_U){setErr("Ese usuario no está disponible.");return}
+      const exists=await sbQ(`users?username=eq.${u}&limit=1`);
+      if((exists&&exists.length)||lsGet("user:"+u)){setErr("Ese usuario ya existe.");return}
+      const hcp=parseFloat(f.hcp)||18;
+      const ud={username:u,name:f.name.trim(),hcp:hcp,hcpT:f.hcpT,isCoach:false};
+      await sbU("users",{username:u,name:ud.name,hcp:hcp,hcpt:f.hcpT,joined_at:Date.now()});
+      lsSet("user:"+u,{...ud,pass:f.pass});
+      lsSet("pass:"+u,f.pass);
+      lsSet("session",ud);onLogin(ud);
+    }catch(e){setErr("Error inesperado.");}
+    finally{setBusy(false);}
+  }
+
+  return(
+    <div style={{...S.app,display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh"}}>
+      <div style={{width:"100%",maxWidth:"360px",padding:"24px 14px"}}>
+        <div style={{textAlign:"center",marginBottom:"28px"}}>
+          <div style={{fontSize:"52px",color:gold}}>φ</div>
+          <div style={{fontSize:"13px",letterSpacing:"4px",color:gold,textTransform:"uppercase"}}>Filo Golf</div>
+          <div style={{fontSize:"9px",color:"#b09050",letterSpacing:"2px",marginTop:"3px"}}>por Filo Coach</div>
+        </div>
+        <div style={S.card}>
+          <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
+            {[["login","Ingresar"],["register","Registrarse"]].map(([m,l])=>(
+              <button key={m} style={{...S.nb(mode===m),flex:1}} onClick={()=>{setMode(m);setErr("")}}>{l}</button>
+            ))}
+          </div>
+          {err&&<div style={S.alt("e")}>{err}</div>}
+          {mode==="register"&&<>
+            <label style={S.lbl}>Código de invitación</label>
+            <input style={{...S.inp,marginBottom:"10px"}} placeholder="Código de tu coach" value={f.code} onChange={e=>upd("code",e.target.value)}/>
+            <label style={S.lbl}>Nombre completo</label>
+            <input style={{...S.inp,marginBottom:"10px"}} placeholder="Nombre y apellido" value={f.name} onChange={e=>upd("name",e.target.value)}/>
+          </>}
+          <label style={S.lbl}>Usuario</label>
+          <input style={{...S.inp,marginBottom:"10px"}} placeholder="sin espacios ni mayúsculas" value={f.user} onChange={e=>upd("user",e.target.value)}/>
+          <label style={S.lbl}>Contraseña</label>
+          <input style={{...S.inp,marginBottom:"10px"}} type="password" value={f.pass} onChange={e=>upd("pass",e.target.value)}/>
+          {mode==="register"&&(
+            <div style={{...S.g2,marginBottom:"10px"}}>
+              <div><label style={S.lbl}>Handicap</label><input style={S.inp} type="number" min="0" max="54" value={f.hcp} onChange={e=>upd("hcp",e.target.value)}/></div>
+              <div><label style={S.lbl}>Tipo</label>
+                <select style={S.sel} value={f.hcpT} onChange={e=>upd("hcpT",e.target.value)}>
+                  <option value="libre">Libre</option>
+                  <option value="aag">Oficial AAG</option>
+                </select>
+              </div>
+            </div>
+          )}
+          <button style={{...S.btn("p"),width:"100%",padding:"12px",fontSize:"14px",marginTop:"4px"}} onClick={mode==="login"?login:register} disabled={busy}>
+            {busy?"Un momento...":(mode==="login"?"Ingresar":"Crear cuenta")}
+          </button>
+          {mode==="register"&&<div style={{marginTop:"10px",fontSize:"10px",color:"#b09050",textAlign:"center"}}>El código te lo da tu coach Adrián.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HoleCard({hole,data,onChange,readonly}){
+  const [open,setOpen]=useState(false);
+  const d=data||{shots:"",putts:"",chips:0,bunker:0,tirosGreen:[],par:"",dist:"",hcpIdx:"",distPutt1:"",salida:"",zones:{},note:""};
+  const upd=(k,v)=>onChange({...d,[k]:v});
+  const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
+  const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note||d.salida;
+  const bigInp={...S.inp,fontSize:"22px",padding:"14px",textAlign:"center",fontWeight:"bold"};
+  const smInp={...S.inp,fontSize:"16px",padding:"11px",textAlign:"center"};
+  const ctrBtn={...S.btn("g"),padding:"10px 18px",fontSize:"22px",lineHeight:1,minWidth:"50px"};
+  const tirosG=d.tirosGreen||[];
+  const lastTiro=tirosG[tirosG.length-1];
+  const greenCerrado=lastTiro&&(lastTiro.resultado==="green"||lastTiro.resultado==="chip"||lastTiro.resultado==="bunker");
+  function addTiro(){
+    const newTiros=[...tirosG,{dist:"",palo:"",resultado:""}];
+    upd("tirosGreen",newTiros);
+  }
+  function updTiro(i,k,v){
+    const newTiros=tirosG.map((t,idx)=>idx===i?{...t,[k]:v}:t);
+    upd("tirosGreen",newTiros);
+  }
+  function removeTiro(i){
+    upd("tirosGreen",tirosG.filter((_,idx)=>idx!==i));
+  }
+  return(
+    <div style={{background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"8px",padding:"16px",marginBottom:"14px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",paddingBottom:"10px",borderBottom:"1px solid #5a4a20"}}>
+        <div style={{color:gold,fontWeight:"bold",fontSize:"22px",letterSpacing:"2px"}}>HOYO {hole}</div>
+        {!readonly&&<button style={{...S.btn("g"),padding:"8px 14px",fontSize:"13px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲ Cerrar":"📝 Notas"}</button>}
+        {readonly&&hasNotes&&<span style={{fontSize:"18px"}}>📝</span>}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+        <div><label style={S.lbl}>Par</label><input style={smInp} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/></div>
+        <div><label style={S.lbl}>Dist (yds)</label><input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/></div>
+        <div><label style={S.lbl}>Índice</label><input style={smInp} type="number" min="1" max="18" placeholder="—" value={d.hcpIdx||""} disabled={readonly} onChange={e=>upd("hcpIdx",e.target.value)}/></div>
+      </div>
+      <div style={{marginBottom:"12px"}}>
+        <label style={S.lbl}>Golpes</label>
+        <input style={bigInp} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
+      </div>
+      <div style={{marginBottom:"12px"}}>
+        <label style={S.lbl}>Putts</label>
+        <input style={bigInp} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
+        <div>
+          <label style={S.lbl}>Chip</label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",padding:"8px"}}>
+            {!readonly
+              ?<><button style={ctrBtn} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
+                <span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.chips||0}</span>
+                <button style={ctrBtn} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
+              :<span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.chips||0}</span>
+            }
+          </div>
+        </div>
+        <div>
+          <label style={S.lbl}>Búnker</label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",padding:"8px"}}>
+            {!readonly
+              ?<><button style={ctrBtn} onClick={()=>upd("bunker",Math.max(0,(parseInt(d.bunker)||0)-1))}>−</button>
+                <span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.bunker||0}</span>
+                <button style={ctrBtn} onClick={()=>upd("bunker",(parseInt(d.bunker)||0)+1)}>+</button></>
+              :<span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.bunker||0}</span>
+            }
+          </div>
+        </div>
+      </div>
+      <div style={{marginBottom:"12px"}}>
+        <label style={S.lbl}>Tiros al green</label>
+        {tirosG.map((t,i)=>(
+          <div key={i} style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"10px",marginBottom:"8px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+              <span style={{color:gold,fontSize:"12px",fontWeight:"bold"}}>Tiro {i+1}</span>
+              {!readonly&&<button style={{...S.btn("d"),padding:"4px 10px",fontSize:"11px"}} onClick={()=>removeTiro(i)}>✕</button>}
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"8px"}}>
+              <div>
+                <label style={S.lbl}>Dist (yds)</label>
+                <input style={smInp} type="number" min="0" max="999" placeholder="—" value={t.dist||""} disabled={readonly} onChange={e=>updTiro(i,"dist",e.target.value)}/>
+              </div>
+              <div>
+                <label style={S.lbl}>Palo</label>
+                <input style={smInp} type="text" placeholder="7H, PW..." value={t.palo||""} disabled={readonly} onChange={e=>updTiro(i,"palo",e.target.value.toUpperCase())}/>
+              </div>
+            </div>
+            <label style={S.lbl}>Resultado</label>
+            <div style={{display:"flex",gap:"6px"}}>
+              {["green","chip","bunker"].map(r=>(
+                <button key={r} style={{...S.btn(t.resultado===r?(r==="green"?"p":"d"):"g"),flex:1,padding:"8px 4px",fontSize:"12px",textTransform:"capitalize"}} disabled={readonly} onClick={()=>updTiro(i,"resultado",t.resultado===r?"":r)}>
+                  {r==="green"?"✓ Green":r==="chip"?"Chip":"Búnker"}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        {!readonly&&!greenCerrado&&(
+          <button style={{...S.btn("g"),width:"100%",padding:"10px",fontSize:"13px"}} onClick={addTiro}>+ Agregar tiro al green</button>
+        )}
+        {readonly&&tirosG.length===0&&<div style={{color:"#b09050",fontSize:"11px",fontStyle:"italic"}}>{parseInt(d.par)===3?"Tiro directo (par 3)":"Sin tiros registrados"}</div>}
+      </div>
+      {(parseInt(d.putts)||0)>0&&(
+        <div style={{marginBottom:"10px"}}>
+          <label style={S.lbl}>Dist. primer putt (yds)</label>
+          <input style={smInp} type="number" min="0" max="99" placeholder="—" value={d.distPutt1||""} disabled={readonly} onChange={e=>upd("distPutt1",e.target.value)}/>
+        </div>
+      )}
+      {open&&!readonly&&(
+        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"14px",marginTop:"10px"}}>
+          <div style={{fontSize:"10px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Anotaciones — Hoyo {hole}</div>
+          <label style={S.lbl}>Tiro de salida (opcional)</label>
+          <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
+            {["Fairway","Rough","Penalidad"].map(op=>(
+              <button key={op} style={{...S.btn(d.salida===op?"p":"g"),flex:1,padding:"10px 4px",fontSize:"13px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
+            ))}
+          </div>
+          {ZONES.map(z=>(
+            <div key={z} style={{marginBottom:"10px"}}>
+              <label style={S.lbl}>{z}</label>
+              <input style={S.inp} placeholder="Nota..." value={d.zones?.[z]||""} onChange={e=>updZ(z,e.target.value)}/>
+            </div>
+          ))}
+          <label style={S.lbl}>Anotación libre</label>
+          <textarea style={{...S.inp,minHeight:"60px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
+        </div>
+      )}
+      {readonly&&hasNotes&&(
+        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px",marginTop:"10px"}}>
+          {d.salida&&<div style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>Salida: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.salida}</span></div>}
+          {ZONES.map(z=>d.zones?.[z]&&(<div key={z} style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>{z}: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.zones[z]}</span></div>))}
+          {d.note&&<div><span style={{color:"#b09050",fontSize:"11px"}}>Libre: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.note}</span></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewRound({user,onSave,onCancel}){
+  const [step,setStep]=useState(1);
+  const [meta,setMeta]=useState({courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18,savedConfig:""});
+  const [holes,setHoles]=useState({});
+  const [err,setErr]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [savedConfigs,setSavedConfigs]=useState(()=>({...PRESET_CONFIGS,...(lsGet("configs:"+user.username)||{})}));
+  const [showSaveCfg,setShowSaveCfg]=useState(false);
+  const [cfgName,setCfgName]=useState("");
+  const course=COURSES.find(c=>c.id===meta.courseId);
+  const holeCount=parseInt(meta.numHoles)||18;
+  const totalShots=Object.values(holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0);
+  const totalPutts=Object.values(holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0);
+  const totalChips=Object.values(holes).reduce((s,h)=>s+(parseInt(h.chips)||0),0);
+  const totalBunker=Object.values(holes).reduce((s,h)=>s+(parseInt(h.bunker)||0),0);
+  const hasDist=Object.values(holes).some(h=>h.dist);
+  const configsForCourse=Object.keys(savedConfigs).filter(k=>k.startsWith(meta.courseId+"|"));
+
+  async function save(){
+    if(!meta.courseId){setErr("Seleccioná una cancha.");return}
+    // Validación por hoyo
+    const avisos=[];
+    for(let h=1;h<=holeCount;h++){
+      const hd=holes[h]||{};
+      if(!parseInt(hd.shots)){avisos.push(`Hoyo ${h}: falta cantidad de golpes`);continue;}
+      if(parseInt(hd.putts)===""||hd.putts===""){avisos.push(`Hoyo ${h}: falta cantidad de putts`);}
+      const par=parseInt(hd.par);
+      const tirosG=hd.tirosGreen||[];
+      if(par>=4){
+        if(tirosG.length===0){avisos.push(`Hoyo ${h} (par ${par||"?"}): falta al menos un tiro al green`);}
+        else{
+          tirosG.forEach((t,i)=>{
+            if(!t.dist)avisos.push(`Hoyo ${h} tiro ${i+1}: falta distancia`);
+            if(!t.palo)avisos.push(`Hoyo ${h} tiro ${i+1}: falta palo`);
+            if(!t.resultado)avisos.push(`Hoyo ${h} tiro ${i+1}: falta resultado (green/chip/búnker)`);
+          });
+        }
+      }
+      if(par===3&&tirosG.length>0){
+        tirosG.forEach((t,i)=>{
+          if(t.dist&&!t.palo)avisos.push(`Hoyo ${h} tiro ${i+1}: falta palo`);
+          if(!t.resultado&&(t.dist||t.palo))avisos.push(`Hoyo ${h} tiro ${i+1}: falta resultado`);
+        });
+      }
+    }
+    if(avisos.length){setErr("Completá estos datos antes de guardar:\n• "+avisos.slice(0,5).join("\n• ")+(avisos.length>5?`\n• ...y ${avisos.length-5} más`:"")); return;}
+    setSaving(true);
+    try{
+      const id=Date.now().toString();
+      const round={id,username:user.username,playerName:user.name,courseId:meta.courseId,courseName:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpT:meta.hcpT,numHoles:holeCount,holes,totalShots,totalPutts,totalChips,totalBunker,createdAt:Date.now()};
+      lsSet("round:"+id,round);
+      const idx=lsGet("rounds:"+user.username)||[];idx.push(id);lsSet("rounds:"+user.username,idx);
+      // Mark as pending sync
+      const pending=lsGet("pending:"+user.username)||[];pending.push(id);lsSet("pending:"+user.username,pending);
+      // Try to sync now
+      const ok=await sbU("rounds",{id,username:user.username,player_name:user.name,course_id:meta.courseId,course_name:course?.name,date:meta.date,format:meta.format,hcp:parseFloat(meta.hcp)||0,hcpt:meta.hcpT,num_holes:holeCount,holes,total_shots:totalShots,total_putts:totalPutts,total_chips:totalChips,total_bunker:totalBunker,created_at:Date.now()});
+      if(ok){const p=lsGet("pending:"+user.username)||[];lsSet("pending:"+user.username,p.filter(x=>x!==id));}
+      onSave();
+    }catch(e){setErr("Error al guardar. Intentá de nuevo.");}
+    finally{setSaving(false);}
+  }
+
+  function saveConfig(){
+    if(!cfgName.trim())return;
+    const key=meta.courseId+"|"+Date.now();
+    const holesOnly={};
+    Object.entries(holes).forEach(([h,d])=>{holesOnly[h]={par:d.par,dist:d.dist}});
+    const configs=lsGet("configs:"+user.username)||{};
+    configs[key]={name:cfgName.trim(),courseId:meta.courseId,holes:holesOnly,savedAt:Date.now()};
+    lsSet("configs:"+user.username,configs);setSavedConfigs({...PRESET_CONFIGS,...configs});setShowSaveCfg(false);
+    alert("✓ Configuración guardada: "+cfgName.trim());
+  }
+
+  return(
+    <div style={S.page}>
+      <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"16px"}}>
+        <button style={S.btn("g")} onClick={onCancel}>← Volver</button>
+        <div style={{fontSize:"14px",color:gold,letterSpacing:"2px",textTransform:"uppercase"}}>Nueva Vuelta</div>
+      </div>
+      {step===1&&(
+        <div style={S.card}>
+          <div style={S.h2}>Datos de la vuelta</div>
+          {err&&<div style={S.alt("e")}>{err}</div>}
+          <label style={S.lbl}>Cancha</label>
+          <select style={{...S.sel,marginBottom:"11px"}} value={meta.courseId} onChange={e=>{
+            const cid=e.target.value;
+            const allCfgs={...PRESET_CONFIGS,...(lsGet("configs:"+user.username)||{})};
+            setSavedConfigs(allCfgs);
+            const cfgsForNew=Object.keys(allCfgs).filter(k=>k.startsWith(cid+"|"));
+            if(cfgsForNew.length===1){
+              // única config: cargar automáticamente
+              const cfg=allCfgs[cfgsForNew[0]];
+              const newH={};
+              Object.entries(cfg.holes||{}).forEach(([h,d])=>{newH[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
+              setHoles(newH);setMeta(m=>({...m,courseId:cid,savedConfig:cfgsForNew[0],numHoles:Object.keys(cfg.holes||{}).length}));
+            }else{
+              setHoles({});setMeta(m=>({...m,courseId:cid,savedConfig:"",numHoles:18}));
+            }
+          }}>
+            <option value="">Seleccioná una cancha</option>
+            {COURSES.map(c=><option key={c.id} value={c.id}>{c.name} — {c.city}</option>)}
+          </select>
+          {meta.courseId&&configsForCourse.length>1&&(
+            <div style={{marginBottom:"11px"}}>
+              <label style={S.lbl}>Elegí el tee</label>
+              <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+                {configsForCourse.map(k=>{
+                  const cfg=savedConfigs[k];
+                  const label=cfg.name.replace(/^.*?(Azul|Blanca|Damas|Roja|Amarilla|Negra|Blanco|Rojo|Amarillo|Negro)/i,"$1")||cfg.name;
+                  const active=meta.savedConfig===k;
+                  return(
+                    <button key={k} style={{...S.btn(active?"p":"g"),minWidth:"70px"}} onClick={()=>{
+                      const newH={};
+                      Object.entries(cfg.holes||{}).forEach(([h,d])=>{newH[h]={...d,shots:"",putts:"",chips:0,bunker:0,yards:"",salida:"",zones:{},note:""}});
+                      setHoles(newH);setMeta(m=>({...m,savedConfig:k,numHoles:Object.keys(cfg.holes||{}).length}));
+                    }}>{label}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <label style={S.lbl}>Cantidad de hoyos</label>
+          <input style={{...S.inp,marginBottom:"11px"}} type="number" min="1" max="36" value={meta.numHoles} onChange={e=>setMeta(m=>({...m,numHoles:e.target.value}))}/>
+          <label style={S.lbl}>Fecha</label>
+          <input style={{...S.inp,marginBottom:"11px"}} type="date" value={meta.date} onChange={e=>setMeta(m=>({...m,date:e.target.value}))}/>
+          <label style={S.lbl}>Formato</label>
+          <select style={{...S.sel,marginBottom:"11px"}} value={meta.format} onChange={e=>setMeta(m=>({...m,format:e.target.value}))}>
+            {(user.isCoach?FORMATS_ALL:FORMATS_A).map(f=><option key={f}>{f}</option>)}
+          </select>
+          <div style={{...S.g2,marginBottom:"11px"}}>
+            <div><label style={S.lbl}>Handicap</label><input style={S.inp} type="number" min="0" max="54" value={meta.hcp} onChange={e=>setMeta(m=>({...m,hcp:e.target.value}))}/></div>
+            <div><label style={S.lbl}>Tipo</label>
+              <select style={S.sel} value={meta.hcpT} onChange={e=>setMeta(m=>({...m,hcpT:e.target.value}))}>
+                <option value="libre">Libre</option><option value="aag">Oficial AAG</option>
+              </select>
+            </div>
+          </div>
+          <button style={{...S.btn("p"),width:"100%",padding:"12px"}} onClick={()=>{if(!meta.courseId){setErr("Seleccioná una cancha.");return}setErr("");setStep(2)}}>Ir a la tarjeta →</button>
+        </div>
+      )}
+      {step===2&&(
+        <div style={S.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"12px",flexWrap:"wrap",gap:"6px"}}>
+            <div>
+              <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{course?.name}</div>
+              <div style={{color:"#b09050",fontSize:"11px"}}>{meta.date} · {meta.format} · HCP {meta.hcp}</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{totalShots||"—"}</div>
+              <div style={{color:"#b09050",fontSize:"10px"}}>{totalPutts} putts · {totalChips} chips · {totalBunker} búnker</div>
+            </div>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"14px"}}>
+            <label style={{...S.lbl,marginBottom:0}}>Hoyos:</label>
+            <input style={{...S.inp,width:"70px",textAlign:"center"}} type="number" min="1" max="36" value={meta.numHoles} onChange={e=>setMeta(m=>({...m,numHoles:e.target.value}))}/>
+          </div>
+          {err&&<div style={S.alt("e")}>{err}</div>}
+          {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
+            <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false}/>
+          ))}
+          <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderTop:"2px solid #7a6030",marginTop:"6px"}}>
+            <div style={{color:"#b09050",fontSize:"12px"}}>Putts: <span style={{color:"#f5ead0"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:"#f5ead0"}}>{totalChips}</span> · Búnker: <span style={{color:"#f5ead0"}}>{totalBunker}</span></div>
+            <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>Total: {totalShots||"—"}</div>
+          </div>
+          {hasDist&&(
+            <div style={{marginTop:"10px"}}>
+              {!showSaveCfg
+                ?<button style={{...S.btn("g"),width:"100%",padding:"10px"}} onClick={()=>{setShowSaveCfg(true);setCfgName(course?.name||"");}}>💾 Guardar configuración de cancha</button>
+                :<div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px"}}>
+                  <label style={S.lbl}>Nombre de la configuración</label>
+                  <input style={{...S.inp,marginBottom:"8px"}} placeholder="Ej: Cañuelas Roja, Hurlingham Azul..." value={cfgName} onChange={e=>setCfgName(e.target.value)}/>
+                  <div style={{display:"flex",gap:"8px"}}>
+                    <button style={S.btn("g")} onClick={()=>setShowSaveCfg(false)}>Cancelar</button>
+                    <button style={{...S.btn("p"),flex:1}} onClick={saveConfig}>Guardar</button>
+                  </div>
+                </div>
+              }
+            </div>
+          )}
+          <div style={{display:"flex",gap:"8px",marginTop:"12px"}}>
+            <button style={S.btn("g")} onClick={()=>setStep(1)}>← Atrás</button>
+            <button style={{...S.btn("p"),flex:1,padding:"11px"}} onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar vuelta ✓"}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoundDetail({round,onBack,coachView,onRoundUpdated}){
+  const course=COURSES.find(c=>c.id===round.courseId||c.id===round.course_id);
+  const count=round.numHoles||round.num_holes||course?.holes||Object.keys(round.holes||{}).length||18;
+  const is18=count===18;
+  const [editing,setEditing]=useState(false);
+  const [holes,setHoles]=useState(()=>{
+    const h={};
+    for(let i=1;i<=count;i++){
+      const d=round.holes?.[i]||round.holes?.[String(i)]||{};
+      h[i]={...d};
+    }
+    return h;
+  });
+  const [saving,setSaving]=useState(false);
+  const [msg,setMsg]=useState("");
+
+  // Subtotales IDA/VUELTA
+  function subTotal(from,to){
+    let t=0;
+    for(let h=from;h<=to;h++) t+=parseInt(holes[h]?.shots||0);
+    return t||"—";
+  }
+  const ida=is18?subTotal(1,9):"—";
+  const vuelta=is18?subTotal(10,18):"—";
+  // Stats de putting de esta vuelta
+  const dp1thisRound=(()=>{
+    const vals=[];
+    for(let h=1;h<=count;h++){const v=parseFloat(holes[h]?.distPutt1);if(v>0)vals.push(v);}
+    return vals;
+  })();
+  const avgDP1this=dp1thisRound.length?(dp1thisRound.reduce((a,b)=>a+b,0)/dp1thisRound.length).toFixed(1):null;
+  const totalDP1this=dp1thisRound.length?dp1thisRound.reduce((a,b)=>a+b,0):null;
+
+  async function saveAnalytics(){
+    setSaving(true);setMsg("");
+    try{
+      // Merge edited analytics fields back into round
+      const newHoles={};
+      for(let h=1;h<=count;h++){
+        const orig=round.holes?.[h]||round.holes?.[String(h)]||{};
+        const ed=holes[h]||{};
+        newHoles[h]={...orig,yards:ed.yards||orig.yards||"",palo:ed.palo||orig.palo||"",distPutt1:ed.distPutt1||orig.distPutt1||""};
+      }
+      const id=round.id;
+      // Update localStorage
+      const local=lsGet("round:"+id);
+      if(local){
+        local.holes=newHoles;
+        lsSet("round:"+id,local);
+      }
+      // Update Supabase
+      const totalShots=round.totalShots||round.total_shots||0;
+      const totalPutts=round.totalPutts||round.total_putts||0;
+      const totalChips=round.totalChips||round.total_chips||0;
+      const totalBunker=round.totalBunker||round.total_bunker||0;
+      await sbU("rounds",{id,username:round.username,player_name:round.playerName||round.player_name,course_id:round.courseId||round.course_id,course_name:round.courseName||round.course_name,date:round.date,format:round.format,hcp:round.hcp||0,hcpt:round.hcpT||round.hcpt||"libre",num_holes:count,holes:newHoles,total_shots:totalShots,total_putts:totalPutts,total_chips:totalChips,total_bunker:totalBunker,created_at:round.createdAt||round.created_at||Date.now()});
+      setHoles(newHoles);
+      setEditing(false);
+      setMsg("✓ Datos actualizados.");
+      if(onRoundUpdated)onRoundUpdated({...round,holes:newHoles});
+    }catch(e){setMsg("Error al guardar. Intentá de nuevo.");}
+    finally{setSaving(false);}
+  }
+
+  // For editing: only analytics fields are editable
+  function updAnalytic(h,k,v){
+    setHoles(p=>({...p,[h]:{...p[h],[k]:v}}));
+  }
+
+  const totalShots=round.totalShots||round.total_shots||0;
+  const totalPutts=round.totalPutts||round.total_putts||0;
+  const totalChips=round.totalChips||round.total_chips||0;
+  const totalBunker=round.totalBunker||round.total_bunker||0;
+
+  return(
+    <div style={S.page}>
+      <button style={{...S.btn("g"),marginBottom:"12px"}} onClick={onBack}>← Volver</button>
+      <div style={S.card}>
+        <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:"8px",marginBottom:"12px"}}>
+          <div>
+            <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{round.courseName||round.course_name}</div>
+            <div style={{color:"#b09050",fontSize:"11px"}}>{round.date} · {round.format} · {count} hoyos</div>
+            {coachView&&<div style={{color:"#b09050",fontSize:"11px"}}>Jugador: <span style={{color:"#f5ead0"}}>{round.playerName||round.player_name}</span></div>}
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{color:gold,fontSize:"28px",fontWeight:"bold"}}>{totalShots}</div>
+            {is18&&(
+              <div style={{color:"#b09050",fontSize:"11px"}}>
+                <span style={{color:"#f5ead0",fontWeight:"bold"}}>{ida}</span> IDA · <span style={{color:"#f5ead0",fontWeight:"bold"}}>{vuelta}</span> VUELTA
+              </div>
+            )}
+            <div style={{color:"#b09050",fontSize:"11px"}}>{totalPutts} putts · {totalChips} chips · {totalBunker} búnker</div>
+            <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {totalShots-(round.hcp||0)}</div>
+            {avgDP1this&&<div style={{color:"#b09050",fontSize:"11px",marginTop:"3px"}}>Prom. 1er putt <span style={{color:"#f5ead0"}}>{avgDP1this} yds</span> · Total <span style={{color:"#f5ead0"}}>{totalDP1this} yds</span></div>}
+          </div>
+        </div>
+
+        {msg&&<div style={msg.startsWith("✓")?{...S.card,background:"#1a2a1a",border:"1px solid #2a5a2a",color:"#8e8",fontSize:"13px",marginBottom:"10px"}:S.alt("e")}>{msg}</div>}
+
+        {!coachView&&(
+          <div style={{marginBottom:"14px"}}>
+            {!editing
+              ?<button style={{...S.btn("g"),width:"100%",padding:"10px"}} onClick={()=>{setEditing(true);setMsg("");}}>✎ Completar datos (palo / distancias)</button>
+              :<div style={{...S.card,background:"#141210",padding:"10px",marginBottom:"0"}}>
+                <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",marginBottom:"6px"}}>Editando: palo, dist. tiro a green y dist. primer putt</div>
+                <div style={{color:"#b09050",fontSize:"10px",marginBottom:"10px"}}>Score, putts, chips y búnker no se pueden modificar.</div>
+                <div style={{display:"flex",gap:"8px"}}>
+                  <button style={S.btn("g")} onClick={()=>{setEditing(false);setMsg("");}}>Cancelar</button>
+                  <button style={{...S.btn("p"),flex:1}} onClick={saveAnalytics} disabled={saving}>{saving?"Guardando...":"Guardar cambios ✓"}</button>
+                </div>
+              </div>
+            }
+          </div>
+        )}
+
+        {Array.from({length:count},(_,i)=>i+1).map(h=>{
+          const d=holes[h]||{};
+          if(!editing){
+            return(
+              <React.Fragment key={h}>
+                {is18&&h===10&&(
+                  <div style={{background:"#2a2318",border:"1px solid #7a6030",borderRadius:"6px",padding:"10px 14px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{color:"#b09050",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase"}}>IDA (1–9)</div>
+                    <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{ida}</div>
+                  </div>
+                )}
+                <HoleCard key={h} hole={h} data={d} onChange={()=>{}} readonly/>
+                {is18&&h===18&&(
+                  <div style={{background:"#2a2318",border:"1px solid #7a6030",borderRadius:"6px",padding:"10px 14px",marginTop:"4px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{color:"#b09050",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase"}}>VUELTA (10–18)</div>
+                    <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{vuelta}</div>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          }
+          // Editing mode: show analytics fields only
+          const smInp={...S.inp,fontSize:"15px",padding:"9px",textAlign:"center"};
+          return(
+            <React.Fragment key={h}>
+              {is18&&h===10&&(
+                <div style={{background:"#2a2318",border:"1px solid #7a6030",borderRadius:"6px",padding:"10px 14px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{color:"#b09050",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase"}}>IDA (1–9)</div>
+                  <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{ida}</div>
+                </div>
+              )}
+              <div style={{background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"8px",padding:"14px",marginBottom:"12px"}}>
+                <div style={{color:gold,fontWeight:"bold",fontSize:"16px",letterSpacing:"2px",marginBottom:"10px",borderBottom:"1px solid #5a4a20",paddingBottom:"8px"}}>
+                  HOYO {h}
+                  <span style={{color:"#b09050",fontSize:"11px",fontWeight:"normal",marginLeft:"10px"}}>{d.shots||"—"} golpes · {d.putts||"—"} putts</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"10px"}}>
+                  <div>
+                    <label style={S.lbl}>Dist. tiro a green (yds)</label>
+                    <input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.yards||""} onChange={e=>updAnalytic(h,"yards",e.target.value)}/>
+                  </div>
+                  <div>
+                    <label style={S.lbl}>Palo escogido</label>
+                    <input style={smInp} type="text" placeholder="7H, PW..." value={d.palo||""} onChange={e=>updAnalytic(h,"palo",e.target.value)}/>
+                  </div>
+                </div>
+                {(parseInt(d.putts)||0)>0&&(
+                  <div>
+                    <label style={S.lbl}>Dist. primer putt (yds)</label>
+                    <input style={smInp} type="number" min="0" max="99" placeholder="—" value={d.distPutt1||""} onChange={e=>updAnalytic(h,"distPutt1",e.target.value)}/>
+                  </div>
+                )}
+              </div>
+              {is18&&h===18&&(
+                <div style={{background:"#2a2318",border:"1px solid #7a6030",borderRadius:"6px",padding:"10px 14px",marginTop:"4px",marginBottom:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div style={{color:"#b09050",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase"}}>VUELTA (10–18)</div>
+                  <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{vuelta}</div>
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MyRounds({user}){
+  const [rounds,setRounds]=useState([]);
+  const [selected,setSelected]=useState(null);
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{loadRounds();},[]);
+
+  async function syncPending(){
+    const pending=lsGet("pending:"+user.username)||[];
+    if(!pending.length)return;
+    const synced=[];
+    for(const id of pending){
+      const r=lsGet("round:"+id);
+      if(!r)continue;
+      const ok=await sbU("rounds",{id,username:r.username,player_name:r.playerName,course_id:r.courseId,course_name:r.courseName,date:r.date,format:r.format,hcp:r.hcp||0,hcpt:r.hcpT,num_holes:r.numHoles||18,holes:r.holes,total_shots:r.totalShots||0,total_putts:r.totalPutts||0,total_chips:r.totalChips||0,total_bunker:r.totalBunker||0,created_at:r.createdAt||Date.now()});
+      if(ok)synced.push(id);
+    }
+    if(synced.length){
+      const remaining=pending.filter(id=>!synced.includes(id));
+      lsSet("pending:"+user.username,remaining);
+    }
+    return synced.length;
+  }
+
+  async function loadRounds(){
+    setLoading(true);
+    // First sync any pending local rounds
+    await syncPending();
+    try{
+      const sb=await sbQ(`rounds?username=eq.${user.username}&order=created_at.desc`);
+      if(sb&&sb.length){
+        // Also merge any local rounds not yet in Supabase
+        const sbIds=new Set(sb.map(r=>r.id));
+        const localIdx=lsGet("rounds:"+user.username)||[];
+        const localOnly=localIdx.map(id=>lsGet("round:"+id)).filter(r=>r&&!sbIds.has(r.id));
+        setRounds([...sb,...localOnly].sort((a,b)=>(b.created_at||b.createdAt||0)-(a.created_at||a.createdAt||0)));
+      }else{
+        const idx=lsGet("rounds:"+user.username)||[];
+        const loaded=idx.map(id=>lsGet("round:"+id)).filter(Boolean);
+        loaded.sort((a,b)=>b.createdAt-a.createdAt);
+        setRounds(loaded);
+      }
+    }catch{
+      const idx=lsGet("rounds:"+user.username)||[];
+      setRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
+    }
+    setLoading(false);
+  }
+
+  const getShots=r=>r.totalShots||r.total_shots||0;
+  const getPutts=r=>r.totalPutts||r.total_putts||0;
+  const getChips=r=>r.totalChips||r.total_chips||0;
+  const getHcp=r=>r.hcp||0;
+  const getHoles=r=>parseInt(r.numHoles||r.num_holes)||18;
+  const getName=r=>r.courseName||r.course_name||"";
+
+  function getIdaVuelta(r){
+    const h=r.holes||{};
+    let ida=0,vuelta=0;
+    for(let i=1;i<=9;i++) ida+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);
+    for(let i=10;i<=18;i++) vuelta+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);
+    return{ida:ida||null,vuelta:vuelta||null};
+  }
+
+  if(selected)return <RoundDetail round={selected} onBack={()=>setSelected(null)} onRoundUpdated={updated=>{
+    setRounds(prev=>prev.map(r=>r.id===updated.id?{...r,...updated}:r));
+    setSelected(s=>({...s,...updated}));
+  }}/>;
+
+  return(
+    <div style={S.page}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
+        <div style={S.h2}>Mis Vueltas</div>
+        <button style={{...S.btn("g"),fontSize:"11px",padding:"7px 12px"}} onClick={loadRounds}>⟳ Actualizar</button>
+      </div>
+      {(lsGet("pending:"+user.username)||[]).length>0&&(
+        <div style={{...S.alt("e"),fontSize:"12px"}}>
+          ⚠️ Tenés {(lsGet("pending:"+user.username)||[]).length} vuelta(s) sin sincronizar. Tocá "Actualizar" cuando tengas conexión.
+        </div>
+      )}
+      {loading&&<div style={{color:"#b09050",textAlign:"center",padding:"20px"}}>Cargando...</div>}
+      {!loading&&rounds.length===0&&(
+        <div style={{...S.card,textAlign:"center",color:"#b09050",padding:"40px 20px"}}>
+          <div style={{fontSize:"32px",marginBottom:"10px"}}>⛳</div>
+          <div>Todavía no registraste ninguna vuelta.</div>
+        </div>
+      )}
+      {rounds.map(r=>{
+        const is18=getHoles(r)===18;
+        const {ida,vuelta}=is18?getIdaVuelta(r):{ida:null,vuelta:null};
+        const dp1r=(()=>{const vals=[];Object.values(r.holes||{}).forEach(h=>{const v=parseFloat(h.distPutt1);if(v>0)vals.push(v);});return vals;})();
+        const avgDP1r=dp1r.length?(dp1r.reduce((a,b)=>a+b,0)/dp1r.length).toFixed(1):null;
+        const totDP1r=dp1r.length?dp1r.reduce((a,b)=>a+b,0):null;
+        return(
+          <div key={r.id} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelected(r)}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div>
+                <div style={{color:"#f5ead0",fontWeight:"bold",marginBottom:"3px"}}>{getName(r)}</div>
+                <div style={{color:"#b09050",fontSize:"11px"}}>{r.date} · {r.format} · {getHoles(r)} hoyos</div>
+                <div style={{color:"#b09050",fontSize:"11px"}}>HCP {getHcp(r)} ({r.hcpT||r.hcpt||"libre"})</div>
+                {is18&&ida&&vuelta&&(
+                  <div style={{color:"#b09050",fontSize:"11px",marginTop:"2px"}}>
+                    IDA <span style={{color:"#f5ead0",fontWeight:"bold"}}>{ida}</span> · VUELTA <span style={{color:"#f5ead0",fontWeight:"bold"}}>{vuelta}</span>
+                  </div>
+                )}
+                {avgDP1r&&<div style={{color:"#b09050",fontSize:"11px",marginTop:"2px"}}>1er putt <span style={{color:"#f5ead0"}}>{avgDP1r} yds</span> · recorrido <span style={{color:"#f5ead0"}}>{totDP1r} yds</span></div>}
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{color:gold,fontSize:"22px",fontWeight:"bold"}}>{getShots(r)}</div>
+                <div style={{color:"#b09050",fontSize:"11px"}}>{getPutts(r)} putts · {getChips(r)} chips</div>
+                <div style={{color:"#b09050",fontSize:"11px"}}>Neto: {getShots(r)-getHcp(r)}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Stats({user}){
+  const [allRounds,setAllRounds]=useState([]);
+  const [filtro,setFiltro]=useState(null);
+  const [selected,setSelected]=useState({});
+
+  useEffect(()=>{
+    (async()=>{
+      try{
+        const sb=await sbQ(`rounds?username=eq.${user.username}&order=created_at.desc`);
+        if(sb&&sb.length){
+          const mapped=sb.map(r=>({id:r.id,courseName:r.course_name,date:r.date,numHoles:r.num_holes||18,totalShots:r.total_shots||0,totalPutts:r.total_putts||0,totalChips:r.total_chips||0,totalBunker:r.total_bunker||0,hcp:r.hcp||0,holes:r.holes||{}}));
+          setAllRounds(mapped);
+        }else{
+          const idx=lsGet("rounds:"+user.username)||[];
+          const local=idx.map(id=>lsGet("round:"+id)).filter(Boolean);
+          local.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+          setAllRounds(local);
+        }
+      }catch{
+        const idx=lsGet("rounds:"+user.username)||[];
+        setAllRounds(idx.map(id=>lsGet("round:"+id)).filter(Boolean));
+      }
+    })();
+  },[]);
+
+  const holeCounts=useMemo(()=>[...new Set(allRounds.map(r=>r.numHoles||18))].sort((a,b)=>a-b),[allRounds]);
+  const activeFiltro=filtro??holeCounts[0]??null;
+  function getFiltered(){
+    if(activeFiltro==="seleccionar"){
+      const sel=allRounds.filter(r=>selected[r.id]);
+      return sel.length?sel:allRounds;
+    }
+    if(activeFiltro!=null)return allRounds.filter(r=>(r.numHoles||18)===activeFiltro);
+    return allRounds;
+  }
+  const rounds=getFiltered();
+
+  return(
+    <div style={S.page}>
+      <div style={S.h2}>Mis Estadísticas</div>
+      {allRounds.length>0&&(
+        <div style={{...S.card,marginBottom:"14px",padding:"12px"}}>
+          <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Ver estadísticas de</div>
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+            {holeCounts.map(h=>(
+              <button key={h} style={S.nb(activeFiltro===h)} onClick={()=>{setFiltro(h);setSelected({});}}>{h} hoyos</button>
+            ))}
+            <button style={S.nb(activeFiltro==="seleccionar")} onClick={()=>{setFiltro("seleccionar");setSelected({});}}>Seleccionar</button>
+          </div>
+          {filtro==="seleccionar"&&(
+            <div style={{marginTop:"10px"}}>
+              <div style={{color:"#b09050",fontSize:"10px",marginBottom:"7px"}}>Marcá las vueltas que querés incluir:</div>
+              {allRounds.map(r=>{
+                const nombre=r.courseName||r.course_name||"Sin nombre";
+                const fecha=r.date||"";
+                return(
+                  <label key={r.id} style={{display:"flex",alignItems:"center",gap:"10px",padding:"7px 0",borderBottom:"1px solid #3a3020",cursor:"pointer"}}>
+                    <input type="checkbox" checked={!!selected[r.id]} onChange={e=>setSelected(p=>({...p,[r.id]:e.target.checked}))} style={{width:"16px",height:"16px",accentColor:gold}}/>
+                    <div>
+                      <div style={{color:"#f5ead0",fontSize:"12px"}}>{nombre}</div>
+                      <div style={{color:"#b09050",fontSize:"10px"}}>{fecha} · {r.numHoles||18} hoyos · {r.totalShots||"—"} golpes</div>
+                    </div>
+                  </label>
+                );
+              })}
+              {Object.values(selected).every(v=>!v)&&<div style={{color:"#b09050",fontSize:"11px",marginTop:"6px",fontStyle:"italic"}}>Sin selección → se muestran todas.</div>}
+            </div>
+          )}
+        </div>
+      )}
+      <StatsView rounds={rounds} hcp={user.hcp} isCoach={false}/>
+    </div>
+  );
+}
+
+function Profile({user,onUpdate}){
+  const [f,setF]=useState({hcp:user.hcp||18,hcpT:user.hcpT||"libre"});
+  const [notas,setNotas]=useState(()=>lsGet("notas:"+user.username)||{});
+  const [configs,setConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
+  const [msg,setMsg]=useState("");
+
+  async function save(){
+    const u={...user,hcp:parseFloat(f.hcp)||0,hcpT:f.hcpT};
+    lsSet("user:"+user.username,u);lsSet("session",u);lsSet("notas:"+user.username,notas);
+    await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,joined_at:user.joinedAt||Date.now()});
+    onUpdate(u);setMsg("✓ Perfil actualizado.");
+  }
+
+  function deleteConfig(key){
+    const c=lsGet("configs:"+user.username)||{};
+    delete c[key];lsSet("configs:"+user.username,c);setConfigs({...c});
+  }
+
+  return(
+    <div style={S.page}>
+      <div style={S.h2}>Mi Perfil</div>
+      <div style={S.card}>
+        <div style={{fontSize:"20px",color:"#f5ead0",fontWeight:"bold"}}>{user.name}</div>
+        <div style={{color:"#b09050",fontSize:"12px",marginTop:"3px",marginBottom:"14px"}}>@{user.username}</div>
+        {msg&&<div style={S.alt("s")}>{msg}</div>}
+        <div style={{...S.g2,marginBottom:"14px"}}>
+          <div><label style={S.lbl}>Handicap</label><input style={S.inp} type="number" min="0" max="54" value={f.hcp} onChange={e=>setF(p=>({...p,hcp:e.target.value}))}/></div>
+          <div><label style={S.lbl}>Tipo</label>
+            <select style={S.sel} value={f.hcpT} onChange={e=>setF(p=>({...p,hcpT:e.target.value}))}>
+              <option value="libre">Libre</option><option value="aag">Oficial AAG</option>
+            </select>
+          </div>
+        </div>
+        <div style={{borderTop:"1px solid #5a4a20",paddingTop:"14px",marginBottom:"14px"}}>
+          <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Notas mentales de juego</div>
+          {[...ZONES,"Nota general"].map(z=>(
+            <div key={z} style={{marginBottom:"10px"}}>
+              <label style={S.lbl}>{z}</label>
+              <textarea style={{...S.inp,minHeight:"52px",resize:"vertical"}} placeholder={`Mi recordatorio para ${z.toLowerCase()}...`} value={notas[z]||""} onChange={e=>setNotas(n=>({...n,[z]:e.target.value}))}/>
+            </div>
+          ))}
+        </div>
+        <button style={{...S.btn("p"),width:"100%",padding:"11px"}} onClick={save}>Guardar cambios</button>
+      </div>
+      {Object.keys(configs).length>0&&(
+        <div style={S.card}>
+          <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Mis configuraciones de cancha</div>
+          {Object.keys(configs).map(k=>{
+            const cfg=configs[k];
+            const course=COURSES.find(c=>c.id===cfg.courseId);
+            return(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+                <div>
+                  <div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div>
+                </div>
+                <button style={{...S.btn("d"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>deleteConfig(k)}>Borrar</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MisCanchas({user}){
+  const [configs,setConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
+  const [courseId,setCourseId]=useState("");
+  const [cfgName,setCfgName]=useState("");
+  const [hoyos,setHoyos]=useState({});
+  const [numHoles,setNumHoles]=useState(18);
+  const [editKey,setEditKey]=useState(null); // key being edited
+  const [msg,setMsg]=useState("");
+
+  function loadConfig(key){
+    const cfg=configs[key]||PRESET_CONFIGS[key];
+    if(!cfg)return;
+    setCourseId(cfg.courseId);
+    setCfgName(cfg.name);
+    setNumHoles(Object.keys(cfg.holes||{}).length||18);
+    setHoyos(cfg.holes||{});
+    setEditKey(key);
+    setMsg("");
+  }
+
+  function newConfig(){
+    setCourseId("");setCfgName("");setHoyos({});setNumHoles(18);setEditKey(null);setMsg("");
+  }
+
+  function saveConfig(){
+    if(!courseId){setMsg("Seleccioná una cancha.");return}
+    if(!cfgName.trim()){setMsg("Ingresá un nombre para la configuración.");return}
+    const key=editKey||(courseId+"|"+Date.now());
+    const holesOnly={};
+    for(let h=1;h<=parseInt(numHoles)||18;h++){
+      const d=hoyos[h]||{};
+      holesOnly[h]={par:d.par||"",dist:d.dist||"",hcpIdx:d.hcpIdx||""};
+    }
+    const c=lsGet("configs:"+user.username)||{};
+    c[key]={name:cfgName.trim(),courseId,holes:holesOnly,savedAt:Date.now()};
+    lsSet("configs:"+user.username,c);
+    setConfigs({...c});
+    setEditKey(key);
+    setMsg("✓ Configuración guardada: "+cfgName.trim());
+  }
+
+  function saveAs(){
+    setCfgName(cfgName+" (copia)");
+    setEditKey(null);
+    setMsg("");
+  }
+
+  function deleteConfig(key){
+    const c=lsGet("configs:"+user.username)||{};
+    delete c[key];lsSet("configs:"+user.username,c);
+    setConfigs({...c});
+    if(editKey===key)newConfig();
+    setMsg("");
+  }
+
+  const course=COURSES.find(c=>c.id===courseId);
+  const holeCount=parseInt(numHoles)||18;
+
+  return(
+    <div style={S.page}>
+      <div style={S.h2}>Mis Canchas</div>
+
+      {/* Lista de configs — presets + propias */}
+      {(()=>{
+        const allKeys=[...Object.keys(PRESET_CONFIGS),...Object.keys(configs)];
+        if(!allKeys.length)return null;
+        return(
+          <div style={{...S.card,marginBottom:"14px"}}>
+            <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>Configuraciones disponibles</div>
+            {allKeys.map(k=>{
+              const isPreset=!!PRESET_CONFIGS[k];
+              const cfg=isPreset?PRESET_CONFIGS[k]:configs[k];
+              const c=COURSES.find(x=>x.id===cfg.courseId);
+              return(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #3a3020"}}>
+                  <div style={{flex:1,cursor:"pointer"}} onClick={()=>loadConfig(k)}>
+                    <div style={{color:editKey===k?gold:"#f5ead0",fontSize:"13px",fontWeight:editKey===k?"bold":"normal"}}>
+                      {cfg.name}{editKey===k?" ✎":""}
+                      {isPreset&&<span style={{marginLeft:"6px",fontSize:"9px",color:"#6a9a50",border:"1px solid #3a6a2a",borderRadius:"3px",padding:"1px 4px"}}>APP</span>}
+                    </div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>{c?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div>
+                  </div>
+                  <div style={{display:"flex",gap:"6px"}}>
+                    <button style={{...S.btn("g"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>loadConfig(k)}>Ver</button>
+                    {!isPreset&&<button style={{...S.btn("d"),fontSize:"11px",padding:"5px 10px"}} onClick={()=>{if(window.confirm("¿Borrar \""+cfg.name+"\"?"))deleteConfig(k)}}>Borrar</button>}
+                  </div>
+                </div>
+              );
+            })}
+            <button style={{...S.btn("g"),marginTop:"10px",width:"100%"}} onClick={newConfig}>+ Nueva configuración</button>
+          </div>
+        );
+      })()}
+
+      {/* Editor de config */}
+      <div style={S.card}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"10px"}}>{editKey?"Editando configuración":"Nueva configuración"}</div>
+        {msg&&<div style={msg.startsWith("✓")?{...S.card,background:"#1a2a1a",border:"1px solid #2a5a2a",color:"#8e8",fontSize:"13px",marginBottom:"10px"}:S.alt("e")}>{msg}</div>}
+        <label style={S.lbl}>Cancha</label>
+        <select style={{...S.sel,marginBottom:"10px"}} value={courseId} onChange={e=>{setCourseId(e.target.value);setMsg("");}}>
+          <option value="">Seleccioná una cancha</option>
+          {COURSES.map(c=><option key={c.id} value={c.id}>{c.name} — {c.city}</option>)}
+        </select>
+        <label style={S.lbl}>Nombre de esta configuración</label>
+        <input style={{...S.inp,marginBottom:"10px"}} placeholder="Ej: Cañuelas Roja, Hurlingham Azul..." value={cfgName} onChange={e=>{setCfgName(e.target.value);setMsg("");}}/>
+        <label style={S.lbl}>Cantidad de hoyos</label>
+        <input style={{...S.inp,marginBottom:"14px"}} type="number" min="1" max="36" value={numHoles} onChange={e=>setNumHoles(e.target.value)}/>
+
+        {/* Tabla de hoyos */}
+        <div style={{...S.card,background:"#141210",marginBottom:"12px",padding:"12px"}}>
+          <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Par, distancia e índice por hoyo</div>
+          <div style={{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr",gap:"6px",marginBottom:"6px"}}>
+            <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>H</div>
+            <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>Par</div>
+            <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>Dist</div>
+            <div style={{color:"#b09050",fontSize:"10px",textTransform:"uppercase",textAlign:"center"}}>Índice</div>
+          </div>
+          {Array.from({length:holeCount},(_,i)=>i+1).map(h=>{
+            const d=hoyos[h]||{};
+            const updH=(k,v)=>setHoyos(p=>({...p,[h]:{...(p[h]||{}),par:p[h]?.par||"",dist:p[h]?.dist||"",hcpIdx:p[h]?.hcpIdx||"",[k]:v}}));
+            return(
+              <div key={h} style={{display:"grid",gridTemplateColumns:"32px 1fr 1fr 1fr",gap:"6px",marginBottom:"4px",alignItems:"center"}}>
+                <div style={{color:gold,fontSize:"12px",fontWeight:"bold",textAlign:"center"}}>{h}</div>
+                <input style={{...S.inp,fontSize:"13px",padding:"6px",textAlign:"center"}} type="number" min="3" max="6" placeholder="—" value={d.par||""} onChange={e=>updH("par",e.target.value)}/>
+                <input style={{...S.inp,fontSize:"13px",padding:"6px",textAlign:"center"}} type="number" min="0" max="999" placeholder="—" value={d.dist||""} onChange={e=>updH("dist",e.target.value)}/>
+                <input style={{...S.inp,fontSize:"13px",padding:"6px",textAlign:"center"}} type="number" min="1" max="18" placeholder="—" value={d.hcpIdx||""} onChange={e=>updH("hcpIdx",e.target.value)}/>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{display:"flex",gap:"8px"}}>
+          <button style={{...S.btn("p"),flex:1,padding:"11px"}} onClick={saveConfig}>💾 Guardar</button>
+          {editKey&&<button style={{...S.btn("g"),padding:"11px"}} onClick={saveAs}>Guardar como...</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoachPlayerStats({player}){
+  const [filtro,setFiltro]=useState(null);
+  const [selected,setSelected]=useState({});
+  const allRounds=player.rounds.map(r=>({
+    id:r.id,courseName:r.course_name||r.courseName,date:r.date,
+    numHoles:r.num_holes||r.numHoles||18,
+    totalShots:r.total_shots||r.totalShots||0,
+    totalPutts:r.total_putts||r.totalPutts||0,
+    totalChips:r.total_chips||r.totalChips||0,
+    totalBunker:r.total_bunker||r.totalBunker||0,
+    hcp:r.hcp||0,holes:r.holes||{}
+  }));
+  const holeCounts=[...new Set(allRounds.map(r=>r.numHoles||18))].sort((a,b)=>a-b);
+  const activeFiltro=filtro??holeCounts[0]??null;
+  function getFiltered(){
+    if(activeFiltro==="seleccionar"){const sel=allRounds.filter(r=>selected[r.id]);return sel.length?sel:allRounds;}
+    if(activeFiltro!=null)return allRounds.filter(r=>(r.numHoles||18)===activeFiltro);
+    return allRounds;
+  }
+  const rounds=getFiltered();
+  return(
+    <div>
+      {allRounds.length>0&&(
+        <div style={{...S.card,marginBottom:"14px",padding:"12px"}}>
+          <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>Ver estadísticas de</div>
+          <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+            {holeCounts.map(h=>(
+              <button key={h} style={S.nb(activeFiltro===h)} onClick={()=>{setFiltro(h);setSelected({});}}>{h} hoyos</button>
+            ))}
+            <button style={S.nb(activeFiltro==="seleccionar")} onClick={()=>{setFiltro("seleccionar");setSelected({});}}>Seleccionar</button>
+          </div>
+          {filtro==="seleccionar"&&(
+            <div style={{marginTop:"10px"}}>
+              <div style={{color:"#b09050",fontSize:"10px",marginBottom:"7px"}}>Marcá las vueltas a incluir:</div>
+              {allRounds.map(r=>(
+                <label key={r.id} style={{display:"flex",alignItems:"center",gap:"10px",padding:"7px 0",borderBottom:"1px solid #3a3020",cursor:"pointer"}}>
+                  <input type="checkbox" checked={!!selected[r.id]} onChange={e=>setSelected(p=>({...p,[r.id]:e.target.checked}))} style={{width:"16px",height:"16px",accentColor:gold}}/>
+                  <div>
+                    <div style={{color:"#f5ead0",fontSize:"12px"}}>{r.courseName||"Sin nombre"}</div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>{r.date} · {r.numHoles} hoyos · {r.totalShots} golpes</div>
+                  </div>
+                </label>
+              ))}
+              {Object.values(selected).every(v=>!v)&&<div style={{color:"#b09050",fontSize:"11px",marginTop:"6px",fontStyle:"italic"}}>Sin selección → se muestran todas.</div>}
+            </div>
+          )}
+        </div>
+      )}
+      <StatsView rounds={rounds} hcp={player.user.hcp} isCoach={true}/>
+    </div>
+  );
+}
+
+function CoachPassReset({username}){
+  const [np,setNp]=useState("");
+  const [msg,setMsg]=useState("");
+  const [busy,setBusy]=useState(false);
+  async function doReset(){
+    if(!np.trim()){setMsg("Ingresá una nueva contraseña.");return;}
+    setBusy(true);setMsg("");
+    try{
+      const ok=await sbPatch("users",{username},{"pass":np.trim()});
+      if(!ok)throw new Error("patch failed");
+      lsSet("pass:"+username,np.trim());
+      setMsg("✓ Contraseña actualizada.");setNp("");
+    }catch(e){setMsg("Error al guardar.");}
+    finally{setBusy(false);}
+  }
+  return(
+    <div style={{marginBottom:"14px"}}>
+      <div style={{display:"flex",gap:"8px",marginBottom:"6px"}}>
+        <input style={{...S.inp,flex:1}} type="text" placeholder="Nueva contraseña" value={np} onChange={e=>setNp(e.target.value)}/>
+        <button style={S.btn("p")} onClick={doReset} disabled={busy}>{busy?"...":"Guardar"}</button>
+      </div>
+      {msg&&<div style={{fontSize:"12px",color:msg.startsWith("✓")?"#6a9a50":"#c04040"}}>{msg}</div>}
+    </div>
+  );
+}
+
+function CoachPanel(){
+  const [tab,setTab]=useState("ranking");
+  const [players,setPlayers]=useState([]);
+  const [selPlayer,setSelPlayer]=useState(null);
+  const [selRound,setSelRound]=useState(null);
+  const [selPlayerTab,setSelPlayerTab]=useState("vueltas");
+  const [loading,setLoading]=useState(false);
+
+  useEffect(()=>{loadAll();},[]);
+
+  async function loadAll(){
+    setLoading(true);
+    try{
+      const sbRounds=await sbQ("rounds?order=created_at.desc");
+      const sbUsers=await sbQ("users");
+      const userMap={};
+      (sbUsers||[]).forEach(u=>{userMap[u.username]={username:u.username,name:u.name,hcp:u.hcp||18,hcpT:u.hcpt||"libre",notas:u.notas||{}}});
+      const byPlayer={};
+      (sbRounds||[]).forEach(r=>{
+        if(!byPlayer[r.username])byPlayer[r.username]={user:userMap[r.username]||{username:r.username,name:r.player_name,hcp:r.hcp||18},rounds:[]};
+        byPlayer[r.username].rounds.push(r);
+      });
+      const result=Object.values(byPlayer);
+      setPlayers(result.length?result:lsGet("coach:players")||[]);
+    }catch{setPlayers(lsGet("coach:players")||[]);}
+    finally{setLoading(false);}
+  }
+
+  function allRounds(){return players.flatMap(p=>p.rounds).sort((a,b)=>(b.created_at||b.createdAt||0)-(a.created_at||a.createdAt||0))}
+
+  function ranking(){
+    const pl={};
+    players.forEach(pkg=>{
+      const u=pkg.user;if(!u)return;
+      const shots=pkg.rounds.reduce((s,r)=>s+(r.total_shots||r.totalShots||0),0);
+      pl[u.username]={name:u.name,hcp:u.hcp,rounds:pkg.rounds,shots};
+    });
+    return Object.values(pl).filter(p=>p.rounds.length).sort((a,b)=>(a.shots/a.rounds.length)-(b.shots/b.rounds.length));
+  }
+
+  if(selRound)return <RoundDetail round={selRound} onBack={()=>setSelRound(null)} coachView/>;
+  const rank=ranking();
+
+  return(
+    <div style={S.page}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
+        <div style={S.h2}>Panel Coach</div>
+        <button style={{...S.btn("g"),fontSize:"11px",padding:"6px 10px"}} onClick={loadAll}>{loading?"⟳...":"⟳ Actualizar"}</button>
+      </div>
+      <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"16px"}}>
+        {[["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"]].map(([t,l])=>(
+          <button key={t} style={S.nb(tab===t)} onClick={()=>{setTab(t);setSelPlayer(null);setSelPlayerTab("vueltas")}}>{l}</button>
+        ))}
+      </div>
+      {loading&&<div style={{color:"#b09050",padding:"20px",textAlign:"center"}}>Cargando datos...</div>}
+
+      {tab==="ranking"&&!loading&&(
+        rank.length===0
+          ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay datos aún.</div>
+          :rank.map((p,i)=>{
+            const avgGross=(p.shots/p.rounds.length).toFixed(1);
+            const netoShots=p.rounds.reduce((s,r)=>s+((r.total_shots||r.totalShots||0)-(r.hcp||0)),0);
+            const avgNeto=(netoShots/p.rounds.length).toFixed(1);
+            const best=Math.min(...p.rounds.map(r=>r.total_shots||r.totalShots||999));
+            const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":"";
+            return(
+              <div key={p.name} style={{...S.card,display:"flex",alignItems:"center",gap:"12px",padding:"12px 14px"}}>
+                <div style={{fontSize:"18px",minWidth:"26px",textAlign:"center"}}>{medal||<span style={{color:"#b09050",fontSize:"12px",fontWeight:"bold"}}>#{i+1}</span>}</div>
+                <div style={{flex:1}}>
+                  <div style={{color:"#f5ead0",fontWeight:"bold",fontSize:"13px"}}>{p.name}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>{getCat(p.hcp)} · HCP {p.hcp} · {p.rounds.length} vuelta{p.rounds.length!==1?"s":""}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:gold,fontSize:"17px",fontWeight:"bold"}}>{avgGross} <span style={{fontSize:"11px",color:"#b09050"}}>gross</span></div>
+                  <div style={{color:"#b09050",fontSize:"13px",fontWeight:"bold"}}>{avgNeto} <span style={{fontSize:"10px"}}>neto</span></div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>mejor: {best===999?"—":best}</div>
+                </div>
+              </div>
+            );
+          })
+      )}
+
+      {tab==="players"&&!loading&&!selPlayer&&(
+        players.length===0
+          ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay alumnos aún.</div>
+          :players.map(pkg=>{
+            const p=pkg.user,rs=pkg.rounds;
+            const avg=rs.length?(rs.reduce((s,r)=>s+(r.total_shots||r.totalShots||0),0)/rs.length).toFixed(1):"—";
+            return(
+              <div key={p.username} style={{...S.card,cursor:"pointer"}} onClick={()=>{setSelPlayer(pkg);setSelPlayerTab("vueltas")}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{color:"#f5ead0",fontWeight:"bold"}}>{p.name}</div>
+                    <div style={{color:"#b09050",fontSize:"11px"}}>{getCat(p.hcp)} · HCP {p.hcp} · {rs.length} vuelta{rs.length!==1?"s":""}</div>
+                  </div>
+                  <div style={{color:gold,fontSize:"19px",fontWeight:"bold"}}>{avg}</div>
+                </div>
+              </div>
+            );
+          })
+      )}
+
+      {tab==="players"&&selPlayer&&(
+        <>
+          <button style={{...S.btn("g"),marginBottom:"12px"}} onClick={()=>setSelPlayer(null)}>← Jugadores</button>
+          <div style={{color:gold,fontSize:"15px",fontWeight:"bold",marginBottom:"4px"}}>{selPlayer.user.name}</div>
+          <div style={{color:"#b09050",fontSize:"11px",marginBottom:"14px"}}>HCP {selPlayer.user.hcp} · {getCat(selPlayer.user.hcp)}</div>
+          <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"14px"}}>
+            {[["vueltas","Vueltas"],["stats","Estadísticas"],["notas","Notas y Canchas"]].map(([t,l])=>(
+              <button key={t} style={{...S.nb(selPlayerTab===t),flex:1}} onClick={()=>setSelPlayerTab(t)}>{l}</button>
+            ))}
+          </div>
+          {selPlayerTab==="stats"&&<CoachPlayerStats player={selPlayer}/>}
+          {selPlayerTab==="notas"&&(
+            <div style={S.card}>
+              <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Resetear contraseña</div>
+              <CoachPassReset username={selPlayer.user.username}/>
+              <div style={{borderTop:"1px solid #5a4a20",marginTop:"2px",paddingTop:"14px"}}>
+              <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Notas mentales</div>
+              {(()=>{
+                const notas=selPlayer.user.notas||{};
+                const tieneNotas=Object.values(notas).some(Boolean);
+                if(!tieneNotas)return <div style={{color:"#b09050",fontSize:"13px",marginBottom:"14px"}}>Sin notas mentales cargadas.</div>;
+                return [...ZONES,"Nota general"].map(z=>notas[z]&&(
+                  <div key={z} style={{marginBottom:"12px"}}>
+                    <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"4px"}}>{z}</div>
+                    <div style={{color:"#f5ead0",fontSize:"13px",background:"#141210",padding:"10px",borderRadius:"4px",border:"1px solid #5a4a20"}}>{notas[z]}</div>
+                  </div>
+                ));
+              })()}
+              <div style={{borderTop:"1px solid #5a4a20",marginTop:"14px",paddingTop:"14px"}}>
+                <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Configuraciones de cancha</div>
+                {(()=>{
+                  const cfgs={...PRESET_CONFIGS,...(lsGet("configs:"+selPlayer.user.username)||{})};
+                  const keys=Object.keys(cfgs);
+                  if(!keys.length)return <div style={{color:"#b09050",fontSize:"13px"}}>Sin configuraciones.</div>;
+                  return keys.map(k=>{
+                    const cfg=cfgs[k];const course=COURSES.find(c=>c.id===cfg.courseId);const isP=!!PRESET_CONFIGS[k];
+                    return(<div key={k} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}><div style={{color:"#f5ead0",fontSize:"13px"}}>{cfg.name}{isP&&<span style={{marginLeft:"6px",fontSize:"9px",color:"#6a9a50",border:"1px solid #3a6a2a",borderRadius:"3px",padding:"1px 4px"}}>APP</span>}</div><div style={{color:"#b09050",fontSize:"10px"}}>{course?.name||cfg.courseId} · {Object.keys(cfg.holes||{}).length} hoyos</div></div>);
+                  });
+                })()}
+              </div>
+              </div>
+            </div>
+          )}
+          {selPlayerTab==="vueltas"&&(
+            <div style={S.card}>
+              {selPlayer.rounds.length===0&&<div style={{color:"#b09050"}}>Sin vueltas registradas.</div>}
+              {selPlayer.rounds.map(r=>{
+                const is18r=(r.num_holes||r.numHoles||18)===18;
+                const h=r.holes||{};
+                let ida18=0,vuelta18=0;
+                if(is18r){for(let i=1;i<=9;i++)ida18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);for(let i=10;i<=18;i++)vuelta18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);}
+                const dp1rc=(()=>{const vals=[];Object.values(h).forEach(hh=>{const v=parseFloat(hh.distPutt1);if(v>0)vals.push(v);});return vals;})();
+                const avgDP1rc=dp1rc.length?(dp1rc.reduce((a,b)=>a+b,0)/dp1rc.length).toFixed(1):null;
+                const totDP1rc=dp1rc.length?dp1rc.reduce((a,b)=>a+b,0):null;
+                return(
+                <div key={r.id} style={{cursor:"pointer",padding:"9px 0",borderBottom:"1px solid #3a3020",display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setSelRound(r)}>
+                  <div>
+                    <div style={{color:"#f5ead0",fontSize:"13px"}}>{r.course_name||r.courseName}</div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>{r.date} · {r.format} · {r.num_holes||r.numHoles||18} hoyos</div>
+                    {is18r&&ida18>0&&vuelta18>0&&<div style={{color:"#b09050",fontSize:"10px"}}>IDA <span style={{color:"#f5ead0"}}>{ida18}</span> · VUELTA <span style={{color:"#f5ead0"}}>{vuelta18}</span></div>}
+                    {avgDP1rc&&<div style={{color:"#b09050",fontSize:"10px"}}>1er putt <span style={{color:"#f5ead0"}}>{avgDP1rc} yds</span> · recorrido <span style={{color:"#f5ead0"}}>{totDP1rc} yds</span></div>}
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{r.total_shots||r.totalShots}</div>
+                    <div style={{color:"#b09050",fontSize:"10px"}}>Neto: {(r.total_shots||r.totalShots||0)-(r.hcp||0)}</div>
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab==="rounds"&&!loading&&(
+        allRounds().length===0
+          ?<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"36px"}}>No hay vueltas aún.</div>
+          :allRounds().map(r=>{
+            const is18r=(r.num_holes||r.numHoles||18)===18;
+            const h=r.holes||{};
+            let ida18=0,vuelta18=0;
+            if(is18r){for(let i=1;i<=9;i++)ida18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);for(let i=10;i<=18;i++)vuelta18+=parseInt(h[i]?.shots||h[String(i)]?.shots||0);}
+            const dp1rg=(()=>{const vals=[];Object.values(h).forEach(hh=>{const v=parseFloat(hh.distPutt1);if(v>0)vals.push(v);});return vals;})();
+            const avgDP1rg=dp1rg.length?(dp1rg.reduce((a,b)=>a+b,0)/dp1rg.length).toFixed(1):null;
+            const totDP1rg=dp1rg.length?dp1rg.reduce((a,b)=>a+b,0):null;
+            return(
+            <div key={r.id} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelRound(r)}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{color:"#f5ead0",fontWeight:"bold"}}>{r.player_name||r.playerName}</div>
+                  <div style={{color:"#b09050",fontSize:"11px"}}>{r.course_name||r.courseName} · {r.date} · {r.num_holes||r.numHoles||18} hoyos</div>
+                  {is18r&&ida18>0&&vuelta18>0&&<div style={{color:"#b09050",fontSize:"11px"}}>IDA <span style={{color:"#f5ead0"}}>{ida18}</span> · VUELTA <span style={{color:"#f5ead0"}}>{vuelta18}</span></div>}
+                  {avgDP1rg&&<div style={{color:"#b09050",fontSize:"11px"}}>1er putt <span style={{color:"#f5ead0"}}>{avgDP1rg} yds</span> · recorrido <span style={{color:"#f5ead0"}}>{totDP1rg} yds</span></div>}
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{r.total_shots||r.totalShots}</div>
+                  <div style={{color:"#b09050",fontSize:"10px"}}>Neto: {(r.total_shots||r.totalShots||0)-(r.hcp||0)}</div>
+                </div>
+              </div>
+            </div>
+            );
+          })
+      )}
+    </div>
+  );
+}
+
+function App(){
+  const [user,setUser]=useState(()=>lsGet("session"));
+  const [tab,setTab]=useState("stats");
+  const [newRound,setNR]=useState(false);
+
+  if(!user)return <Auth onLogin={u=>{lsSet("session",u);setUser(u)}}/>;
+
+  const nav=user.isCoach
+    ?[["stats","Inicio"],["coach","Coach"],["ronda","+ Vuelta"]]
+    :[["stats","Mis Stats"],["myrounds","Mis Vueltas"],["ronda","+ Vuelta"],["canchas","🏌 Canchas"],["profile","Perfil"]];
+
+  function go(t){if(t==="ronda"){setNR(true);return}setNR(false);setTab(t)}
+
+  return(
+    <div style={S.app}>
+      <div style={S.hdr}>
+        <div style={{display:"flex",alignItems:"center"}}>
+          <div style={{fontSize:"26px",color:gold,marginRight:"8px"}}>φ</div>
+          <div>
+            <div style={{fontSize:"12px",letterSpacing:"3px",color:gold,textTransform:"uppercase"}}>Filo Golf</div>
+            <div style={{fontSize:"9px",color:"#b09050",letterSpacing:"2px"}}>por Filo Coach</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+          {nav.map(([t,l])=>(
+            <button key={t} style={S.nb(!newRound&&tab===t||newRound&&t==="ronda")} onClick={()=>go(t)}>{l}</button>
+          ))}
+          <button style={{...S.btn("g"),fontSize:"10px",padding:"5px 9px"}} onClick={()=>{lsSet("session",null);setUser(null)}}>Salir</button>
+        </div>
+      </div>
+      {newRound
+        ?<NewRound user={user} onSave={()=>{setNR(false);setTab("myrounds")}} onCancel={()=>setNR(false)}/>
+        :tab==="stats"?<Stats user={user}/>
+        :tab==="myrounds"?<MyRounds user={user}/>
+        :tab==="coach"&&user.isCoach?<CoachPanel/>
+        :tab==="canchas"?<MisCanchas user={user}/>
+        :tab==="profile"?<Profile user={user} onUpdate={u=>setUser(u)}/>
+        :null
+      }
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
