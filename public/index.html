@@ -1867,13 +1867,25 @@ function CoachPassReset({username}){
 // ─── CLASE EN CANCHA ──────────────────────────────────────────────────────────
 function ClaseEnCancha(){
   const CLASE_LS="coach:clases";
-  const [phase,setPhase]=useState("list"); // list | setup | active | report
+  const CLASE_ACTIVE_LS="coach:claseActiva";
+  // Recuperar clase activa y fase si la app se cerró en medio de una clase
+  const [phase,setPhase]=useState(()=>{
+    const saved=lsGet(CLASE_ACTIVE_LS);
+    return saved?"active":"list";
+  });
   const [clases,setClases]=useState(()=>lsGet(CLASE_LS)||[]);
-  const [cur,setCur]=useState(null); // clase activa
-  const [selClase,setSelClase]=useState(null); // para ver historial
+  const [cur,setCur]=useState(()=>lsGet(CLASE_ACTIVE_LS)||null);
+  const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
 
   function saveClases(arr){setClases(arr);lsSet(CLASE_LS,arr);}
+
+  // Persiste la clase activa en cada cambio — sobrevive salida de la app
+  function setCurPersist(claseObj){
+    setCur(claseObj);
+    if(claseObj)lsSet(CLASE_ACTIVE_LS,claseObj);
+    else lsSet(CLASE_ACTIVE_LS,null);
+  }
 
   // ── Setup nueva clase ──────────────────────────────────────────────────────
   function SetupClase(){
@@ -1898,7 +1910,7 @@ function ClaseEnCancha(){
         jugadores:js.map(j=>({nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,holes:{},notas:{},notaGeneral:""})),
         resumenCoach:"",finalizada:false,createdAt:Date.now()
       };
-      setCur(nuevaClase);setPhase("active");
+      setCurPersist(nuevaClase);setPhase("active");
     }
 
     return(
@@ -1963,7 +1975,7 @@ function ClaseEnCancha(){
 
     function updClase(fn){
       const next={...clase};fn(next);
-      setClase(next);setCur(next);
+      setClase(next);setCurPersist(next);
     }
 
     function updHole(jIdx,hNum,k,v){
@@ -2004,13 +2016,14 @@ function ClaseEnCancha(){
 
     function finalizar(){
       updClase(c=>{c.finalizada=true;});
+      // No limpiar CLASE_ACTIVE_LS acá — se limpia al guardar desde el reporte
       setPhase("report");
     }
 
     function guardarBorrador(){
       const arr=[...clases.filter(c=>c.id!==clase.id),clase];
       saveClases(arr);
-      alert("✓ Clase guardada como borrador");
+      alert("✓ Clase guardada. Si salís de la app, al volver la encontrás donde la dejaste.");
     }
 
     const j=clase.jugadores[selJ];
@@ -2293,7 +2306,9 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
   if(phase==="report"){
     function guardarYSalir(){
       const arr=[...clases.filter(c=>c.id!==cur.id),cur];
-      saveClases(arr);setPhase("list");setCur(null);
+      saveClases(arr);
+      setCurPersist(null); // limpia el activo — ya quedó guardado en historial
+      setPhase("list");setCur(null);
     }
     return <Reporte clase={cur} onBack={guardarYSalir}/>;
   }
@@ -2321,7 +2336,7 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
         <div style={{...S.card,background:"#1a2a12",border:"1px solid #3a6a2a",marginBottom:"14px"}}>
           <div style={{color:"#6a9a50",fontSize:"11px",letterSpacing:"1px",marginBottom:"8px"}}>📋 BORRADORES EN CURSO</div>
           {clases.filter(c=>!c.finalizada).map(cl=>(
-            <div key={cl.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #2a3a20",cursor:"pointer"}} onClick={()=>{setCur(cl);setPhase("active");}}>
+            <div key={cl.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #2a3a20",cursor:"pointer"}} onClick={()=>{setCurPersist(cl);setPhase("active");}}>
               <div>
                 <div style={{color:"#f5ead0",fontSize:"13px"}}>{cl.fecha} · {cl.courseName}</div>
                 <div style={{color:"#b09050",fontSize:"10px"}}>{cl.jugadores.map(j=>`${j.nombre} ${j.apellido}`).join(", ")}</div>
