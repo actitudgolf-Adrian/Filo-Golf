@@ -2382,7 +2382,8 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 // ─── END CLASE EN CANCHA ──────────────────────────────────────────────────────
 
 function CoachPanel(){
-  const [tab,setTab]=useState("ranking");
+  // Si hay una clase activa guardada, arrancar directo en ese tab
+  const [tab,setTab]=useState(()=>lsGet("coach:claseActiva")?"clase":"ranking");
   const [players,setPlayers]=useState([]);
   const [selPlayer,setSelPlayer]=useState(null);
   const [selRound,setSelRound]=useState(null);
@@ -2594,7 +2595,12 @@ function CoachPanel(){
 
 function App(){
   const [user,setUser]=useState(()=>lsGet("session"));
-  const [tab,setTab]=useState("stats");
+  const [tab,setTab]=useState(()=>{
+    // Si hay clase activa y el usuario es coach, arrancar directo en "coach"
+    const u=lsGet("session");
+    if(u&&u.isCoach&&lsGet("coach:claseActiva"))return "coach";
+    return "stats";
+  });
   const [newRound,setNR]=useState(false);
 
   if(!user)return <Auth onLogin={u=>{lsSet("session",u);setUser(u)}}/>;
