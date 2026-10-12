@@ -1864,6 +1864,172 @@ function CoachPassReset({username}){
   );
 }
 
+// ─── CLASE ACTIVA PANEL — componente independiente para evitar re-mount ───────
+function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubTab,recStatus,setRecStatus,onUpdate,onFinalizar,onGuardar}){
+
+  function updClase(fn){
+    const next=JSON.parse(JSON.stringify(clase));fn(next);onUpdate(next);
+  }
+  function updHole(jIdx,hNum,k,v){
+    updClase(c=>{
+      if(!c.jugadores[jIdx].holes[hNum])c.jugadores[jIdx].holes[hNum]={};
+      c.jugadores[jIdx].holes[hNum][k]=v;
+    });
+  }
+  function updNota(jIdx,hNum,texto){
+    updClase(c=>{
+      if(hNum===0)c.jugadores[jIdx].notaGeneral=texto;
+      else{c.jugadores[jIdx].notas[hNum]=texto;}
+    });
+  }
+  function startVoice(jIdx,hNum){
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+      alert("⚠️ Reconocimiento de voz no disponible. Escribí la nota a mano.");return;
+    }
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const rec=new SR();
+    rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
+    setRecStatus("recording");
+    rec.onresult=e=>{
+      const txt=e.results[0][0].transcript;
+      const prev=hNum===0?clase.jugadores[jIdx].notaGeneral:(clase.jugadores[jIdx].notas[hNum]||"");
+      updNota(jIdx,hNum,prev+(txt?" "+txt:""));
+      setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
+    };
+    rec.onerror=e=>{
+      if(e.error==="network"||e.error==="no-speech")alert("⚠️ Sin señal o sin voz. Escribí la nota.");
+      setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);
+    };
+    rec.start();
+  }
+  function finalizar(){
+    const next=JSON.parse(JSON.stringify(clase));next.finalizada=true;onFinalizar(next);
+  }
+  function guardarBorrador(){
+    const next=JSON.parse(JSON.stringify(clase));
+    const arr=[...clases.filter(c=>c.id!==next.id),next];
+    onGuardar(next,arr);
+    alert("✓ Clase guardada. Si salís de la app, al volver la encontrás donde la dejaste.");
+  }
+
+  const j=clase.jugadores[selJ];
+  const hNum=selH;
+
+  return(
+    <div style={S.page}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+        <div style={S.h2}>Clase · {clase.fecha}</div>
+        <div style={{display:"flex",gap:"6px"}}>
+          <button style={{...S.btn("g"),fontSize:"10px",padding:"5px 8px"}} onClick={guardarBorrador}>💾 Guardar</button>
+          <button style={{...S.btn("p"),fontSize:"10px",padding:"5px 8px"}} onClick={finalizar}>Finalizar →</button>
+        </div>
+      </div>
+
+      {/* Selector jugador */}
+      <div style={{display:"flex",gap:"5px",marginBottom:"10px",flexWrap:"wrap"}}>
+        {clase.jugadores.map((jj,i)=>(
+          <button key={i} style={{...S.nb(selJ===i),flex:1,minWidth:"70px"}} onClick={()=>setSelJ(i)}>
+            {jj.nombre}
+          </button>
+        ))}
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:"5px",marginBottom:"10px"}}>
+        {[["tarjeta","Tarjeta"],["notas","Notas"]].map(([t,l])=>(
+          <button key={t} style={S.nb(subTab===t)} onClick={()=>setSubTab(t)}>{l}</button>
+        ))}
+      </div>
+
+      {/* Selector hoyo */}
+      <div style={{display:"flex",gap:"4px",marginBottom:"12px",flexWrap:"wrap"}}>
+        {Array.from({length:clase.numHoles},(_,i)=>i+1).map(h=>{
+          const hd=clase.jugadores[selJ].holes[h]||{};
+          const filled=!!hd.shots;
+          return(
+            <button key={h} onClick={()=>setSelH(h)} style={{
+              minWidth:"32px",padding:"5px 3px",fontSize:"11px",fontWeight:"bold",
+              background:selH===h?"#C9A84C":(filled?"#2a3a1a":"#1a1612"),
+              color:selH===h?"#1a1612":(filled?"#6a9a50":"#b09050"),
+              border:`1px solid ${selH===h?"#C9A84C":filled?"#3a6a2a":"#3a3020"}`,
+              borderRadius:"5px",cursor:"pointer"
+            }}>{h}</button>
+          );
+        })}
+      </div>
+
+      {subTab==="tarjeta"&&(()=>{
+        const hd=j.holes[hNum]||{};
+        return(
+          <div style={S.card}>
+            <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",marginBottom:"10px"}}>HOYO {hNum} · {j.nombre} {j.apellido}</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"8px"}}>
+              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>GOLPES</div>
+                <input type="number" min="1" max="20" value={hd.shots||""} onChange={e=>updHole(selJ,hNum,"shots",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="—"/></div>
+              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>PUTTS</div>
+                <input type="number" min="0" max="10" value={hd.putts||""} onChange={e=>updHole(selJ,hNum,"putts",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="—"/></div>
+              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>PAR</div>
+                <select value={hd.par||""} onChange={e=>updHole(selJ,hNum,"par",e.target.value)} style={{...S.inp,width:"100%"}}>
+                  <option value="">—</option>{[3,4,5].map(p=><option key={p} value={p}>{p}</option>)}
+                </select></div>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}}>
+              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>CHIPS</div>
+                <input type="number" min="0" max="10" value={hd.chips||""} onChange={e=>updHole(selJ,hNum,"chips",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
+              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>BUNKER</div>
+                <input type="number" min="0" max="10" value={hd.bunker||""} onChange={e=>updHole(selJ,hNum,"bunker",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
+              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>1er PUTT (yds)</div>
+                <input type="number" min="0" max="100" value={hd.distPutt1||""} onChange={e=>updHole(selJ,hNum,"distPutt1",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {subTab==="notas"&&(()=>{
+        const notaH=j.notas[hNum]||"";
+        return(
+          <div style={S.card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
+              <div style={{color:gold,fontSize:"12px",letterSpacing:"2px"}}>NOTA · HOYO {hNum} · {j.nombre}</div>
+              <button onClick={()=>startVoice(selJ,hNum)} disabled={recStatus==="recording"} style={{
+                background:recStatus==="recording"?"#8B1A1A":recStatus==="done"?"#1a4a1a":"#1a1612",
+                border:`1px solid ${recStatus==="recording"?"#c04040":"#5a4a20"}`,
+                color:recStatus==="recording"?"#ff6060":recStatus==="done"?"#6a9a50":"#b09050",
+                borderRadius:"6px",padding:"6px 12px",cursor:"pointer",fontSize:"12px"
+              }}>{recStatus==="recording"?"🔴 Grabando...":recStatus==="done"?"✓ Listo":"🎤 Grabar"}</button>
+            </div>
+            <textarea value={notaH} onChange={e=>updNota(selJ,hNum,e.target.value)}
+              placeholder="Nota para este hoyo..."
+              style={{...S.inp,width:"100%",minHeight:"100px",resize:"vertical"}}/>
+          </div>
+        );
+      })()}
+
+      {/* Nota general del jugador */}
+      <div style={{...S.card,marginTop:"10px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+          <div style={{color:gold,fontSize:"11px",letterSpacing:"2px"}}>NOTA GENERAL · {j.nombre.toUpperCase()}</div>
+          <button onClick={()=>startVoice(selJ,0)} disabled={recStatus==="recording"} style={{
+            background:recStatus==="recording"?"#8B1A1A":"#1a1612",
+            border:"1px solid #5a4a20",color:"#b09050",borderRadius:"6px",padding:"5px 10px",cursor:"pointer",fontSize:"11px"
+          }}>🎤</button>
+        </div>
+        <textarea value={j.notaGeneral||""} onChange={e=>updNota(selJ,0,e.target.value)}
+          placeholder="Resumen del jugador..."
+          style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
+      </div>
+
+      {/* Resumen coach */}
+      <div style={{...S.card,marginTop:"10px"}}>
+        <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",marginBottom:"8px"}}>RESUMEN COACH (clase completa)</div>
+        <textarea value={clase.resumenCoach||""} onChange={e=>updClase(c=>{c.resumenCoach=e.target.value;})}
+          placeholder="Observaciones generales de la clase..."
+          style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
+      </div>
+    </div>
+  );
+}
+
 // ─── CLASE EN CANCHA ──────────────────────────────────────────────────────────
 function ClaseEnCancha(){
   const CLASE_LS="coach:clases";
@@ -1970,183 +2136,7 @@ function ClaseEnCancha(){
     );
   }
 
-  // ── Clase activa ────────────────────────────────────────────────────────────
-  function ClaseActiva(){
-    const [clase,setClase]=useState(cur);
-    // selJ, selH, subTab, recStatus viven en el padre para no resetearse
-
-    function updClase(fn){
-      const next={...clase};fn(next);
-      setClase(next);setCurPersist(next);
-    }
-
-    function updHole(jIdx,hNum,k,v){
-      updClase(c=>{
-        if(!c.jugadores[jIdx].holes[hNum])c.jugadores[jIdx].holes[hNum]={};
-        c.jugadores[jIdx].holes[hNum][k]=v;
-      });
-    }
-
-    function updNota(jIdx,hNum,texto){
-      updClase(c=>{
-        if(hNum===0)c.jugadores[jIdx].notaGeneral=texto;
-        else{if(!c.jugadores[jIdx].notas[hNum])c.jugadores[jIdx].notas[hNum]="";c.jugadores[jIdx].notas[hNum]=texto;}
-      });
-    }
-
-    function startVoice(jIdx,hNum){
-      if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
-        alert("⚠️ Reconocimiento de voz no disponible. Escribí la nota a mano.");
-        return;
-      }
-      const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
-      const rec=new SpeechRec();
-      rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;
-      rec.continuous=false;
-      setRecStatus("recording");
-      rec.onresult=e=>{
-        const txt=e.results[0][0].transcript;
-        updNota(jIdx,hNum,(hNum===0?clase.jugadores[jIdx].notaGeneral:clase.jugadores[jIdx].notas[hNum]||"")+(txt?" "+txt:""));
-        setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
-      };
-      rec.onerror=e=>{
-        if(e.error==="network"||e.error==="no-speech")alert("⚠️ Sin señal o sin voz detectada. Escribí la nota.");
-        setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);
-      };
-      rec.start();
-    }
-
-    function finalizar(){
-      updClase(c=>{c.finalizada=true;});
-      // No limpiar CLASE_ACTIVE_LS acá — se limpia al guardar desde el reporte
-      setPhase("report");
-    }
-
-    function guardarBorrador(){
-      const arr=[...clases.filter(c=>c.id!==clase.id),clase];
-      saveClases(arr);
-      alert("✓ Clase guardada. Si salís de la app, al volver la encontrás donde la dejaste.");
-    }
-
-    const j=clase.jugadores[selJ];
-    const hNum=selH;
-    const noteKey=subTab==="notas"?hNum:hNum;
-
-    return(
-      <div style={S.page}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-          <div style={S.h2}>Clase · {clase.fecha}</div>
-          <div style={{display:"flex",gap:"6px"}}>
-            <button style={{...S.btn("g"),fontSize:"10px",padding:"5px 8px"}} onClick={guardarBorrador}>💾 Guardar</button>
-            <button style={{...S.btn("p"),fontSize:"10px",padding:"5px 8px"}} onClick={finalizar}>Finalizar →</button>
-          </div>
-        </div>
-
-        {/* Selector jugador */}
-        <div style={{display:"flex",gap:"5px",marginBottom:"10px",flexWrap:"wrap"}}>
-          {clase.jugadores.map((j,i)=>(
-            <button key={i} style={{...S.nb(selJ===i),flex:1,minWidth:"70px"}} onClick={()=>setSelJ(i)}>
-              {j.nombre}
-            </button>
-          ))}
-        </div>
-
-        {/* Sub-tabs tarjeta / notas */}
-        <div style={{display:"flex",gap:"5px",marginBottom:"10px"}}>
-          {[["tarjeta","Tarjeta"],["notas","Notas"]].map(([t,l])=>(
-            <button key={t} style={S.nb(subTab===t)} onClick={()=>setSubTab(t)}>{l}</button>
-          ))}
-        </div>
-
-        {/* Selector hoyo */}
-        <div style={{display:"flex",gap:"4px",marginBottom:"12px",flexWrap:"wrap"}}>
-          {Array.from({length:clase.numHoles},(_,i)=>i+1).map(h=>{
-            const hd=clase.jugadores[selJ].holes[h]||{};
-            const filled=!!hd.shots;
-            return(
-              <button key={h} onClick={()=>setSelH(h)} style={{
-                minWidth:"32px",padding:"5px 3px",fontSize:"11px",fontWeight:"bold",
-                background:selH===h?"#C9A84C":(filled?"#2a3a1a":"#1a1612"),
-                color:selH===h?"#1a1612":(filled?"#6a9a50":"#b09050"),
-                border:`1px solid ${selH===h?"#C9A84C":filled?"#3a6a2a":"#3a3020"}`,
-                borderRadius:"5px",cursor:"pointer"
-              }}>{h}</button>
-            );
-          })}
-        </div>
-
-        {subTab==="tarjeta"&&(()=>{
-          const hd=j.holes[hNum]||{};
-          function sh(k,v){updHole(selJ,hNum,k,v);}
-          return(
-            <div style={S.card}>
-              <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",marginBottom:"10px"}}>HOYO {hNum} · {j.nombre} {j.apellido}</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"8px"}}>
-                <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>GOLPES</div>
-                  <input type="number" min="1" max="20" value={hd.shots||""} onChange={e=>sh("shots",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="—"/></div>
-                <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>PUTTS</div>
-                  <input type="number" min="0" max="10" value={hd.putts||""} onChange={e=>sh("putts",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="—"/></div>
-                <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>PAR</div>
-                  <select value={hd.par||""} onChange={e=>sh("par",e.target.value)} style={{...S.inp,width:"100%"}}>
-                    <option value="">—</option>{[3,4,5].map(p=><option key={p} value={p}>{p}</option>)}
-                  </select></div>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}}>
-                <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>CHIPS</div>
-                  <input type="number" min="0" max="10" value={hd.chips||""} onChange={e=>sh("chips",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
-                <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>BUNKER</div>
-                  <input type="number" min="0" max="10" value={hd.bunker||""} onChange={e=>sh("bunker",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
-                <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>1er PUTT (yds)</div>
-                  <input type="number" min="0" max="100" value={hd.distPutt1||""} onChange={e=>sh("distPutt1",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {subTab==="notas"&&(()=>{
-          const notaH=j.notas[hNum]||"";
-          return(
-            <div style={S.card}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
-                <div style={{color:gold,fontSize:"12px",letterSpacing:"2px"}}>NOTA · HOYO {hNum} · {j.nombre}</div>
-                <button onClick={()=>startVoice(selJ,hNum)} disabled={recStatus==="recording"} style={{
-                  background:recStatus==="recording"?"#8B1A1A":recStatus==="done"?"#1a4a1a":"#1a1612",
-                  border:`1px solid ${recStatus==="recording"?"#c04040":"#5a4a20"}`,
-                  color:recStatus==="recording"?"#ff6060":recStatus==="done"?"#6a9a50":"#b09050",
-                  borderRadius:"6px",padding:"6px 12px",cursor:"pointer",fontSize:"12px"
-                }}>{recStatus==="recording"?"🔴 Grabando...":recStatus==="done"?"✓ Listo":"🎤 Grabar"}</button>
-              </div>
-              <textarea value={notaH} onChange={e=>updNota(selJ,hNum,e.target.value)}
-                placeholder="Nota para este hoyo..."
-                style={{...S.inp,width:"100%",minHeight:"100px",resize:"vertical"}}/>
-            </div>
-          );
-        })()}
-
-        {/* Nota general del jugador */}
-        <div style={{...S.card,marginTop:"10px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-            <div style={{color:gold,fontSize:"11px",letterSpacing:"2px"}}>NOTA GENERAL · {j.nombre.toUpperCase()}</div>
-            <button onClick={()=>startVoice(selJ,0)} disabled={recStatus==="recording"} style={{
-              background:recStatus==="recording"?"#8B1A1A":"#1a1612",
-              border:"1px solid #5a4a20",color:"#b09050",borderRadius:"6px",padding:"5px 10px",cursor:"pointer",fontSize:"11px"
-            }}>🎤</button>
-          </div>
-          <textarea value={j.notaGeneral||""} onChange={e=>updNota(selJ,0,e.target.value)}
-            placeholder="Resumen del jugador..."
-            style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
-        </div>
-
-        {/* Resumen coach */}
-        <div style={{...S.card,marginTop:"10px"}}>
-          <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",marginBottom:"8px"}}>RESUMEN COACH (clase completa)</div>
-          <textarea value={clase.resumenCoach||""} onChange={e=>updClase(c=>{c.resumenCoach=e.target.value;})}
-            placeholder="Observaciones generales de la clase..."
-            style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
-        </div>
-      </div>
-    );
-  }
+  // ── Clase activa — delegada a componente externo ClaseActivaPanel ──────────
 
   // ── Reporte / PDF ─────────────────────────────────────────────────────────
   function Reporte({clase,onBack}){
@@ -2304,7 +2294,17 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 
   // ── Lista / historial ───────────────────────────────────────────────────────
   if(phase==="setup")return <SetupClase/>;
-  if(phase==="active")return <ClaseActiva/>;
+  if(phase==="active")return <ClaseActivaPanel
+    clase={cur}
+    clases={clases}
+    selJ={selJ} setSelJ={setSelJ}
+    selH={selH} setSelH={setSelH}
+    subTab={subTab} setSubTab={setSubTab}
+    recStatus={recStatus} setRecStatus={setRecStatus}
+    onUpdate={next=>{setCurPersist(next);setCur(next);}}
+    onFinalizar={next=>{setCurPersist(next);setCur(next);setPhase("report");}}
+    onGuardar={(next,arr)=>{setCurPersist(next);setCur(next);saveClases(arr);}}
+  />;
   if(phase==="report"){
     function guardarYSalir(){
       const arr=[...clases.filter(c=>c.id!==cur.id),cur];
