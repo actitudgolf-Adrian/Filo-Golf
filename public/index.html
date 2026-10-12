@@ -1892,8 +1892,14 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     setRecStatus("recording");
     rec.onresult=e=>{
       const txt=e.results[0][0].transcript;
-      const prev=hNum===0?clase.jugadores[jIdx].notaGeneral:(clase.jugadores[jIdx].notas[hNum]||"");
-      updNota(jIdx,hNum,prev+(txt?" "+txt:""));
+      if(hNum===-1){
+        // resumen coach del jugador
+        const prev=clase.jugadores[jIdx].resumenCoach||"";
+        updClase(c=>{c.jugadores[jIdx].resumenCoach=prev+(txt?" "+txt:"");});
+      } else {
+        const prev=hNum===0?clase.jugadores[jIdx].notaGeneral:(clase.jugadores[jIdx].notas[hNum]||"");
+        updNota(jIdx,hNum,prev+(txt?" "+txt:""));
+      }
       setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
     };
     rec.onerror=e=>{
@@ -2019,11 +2025,17 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
           style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
       </div>
 
-      {/* Resumen coach */}
+      {/* Resumen coach — por jugador */}
       <div style={{...S.card,marginTop:"10px"}}>
-        <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",marginBottom:"8px"}}>RESUMEN COACH (clase completa)</div>
-        <textarea value={clase.resumenCoach||""} onChange={e=>updClase(c=>{c.resumenCoach=e.target.value;})}
-          placeholder="Observaciones generales de la clase..."
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+          <div style={{color:gold,fontSize:"11px",letterSpacing:"2px"}}>RESUMEN COACH · {j.nombre.toUpperCase()}</div>
+          <button onClick={()=>startVoice(selJ,-1)} disabled={recStatus==="recording"} style={{
+            background:recStatus==="recording"?"#8B1A1A":"#1a1612",
+            border:"1px solid #5a4a20",color:"#b09050",borderRadius:"6px",padding:"5px 10px",cursor:"pointer",fontSize:"11px"
+          }}>{recStatus==="recording"?"🔴":"🎤"}</button>
+        </div>
+        <textarea value={j.resumenCoach||""} onChange={e=>updClase(c=>{c.jugadores[selJ].resumenCoach=e.target.value;})}
+          placeholder="Observaciones del coach para este jugador..."
           style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
       </div>
     </div>
@@ -2078,8 +2090,8 @@ function ClaseEnCancha(){
       const nuevaClase={
         id:"clase_"+Date.now(),
         fecha,courseId:cancha,courseName:course.name,numHoles,
-        jugadores:js.map(j=>({nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,holes:{},notas:{},notaGeneral:""})),
-        resumenCoach:"",finalizada:false,createdAt:Date.now()
+        jugadores:js.map(j=>({nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,holes:{},notas:{},notaGeneral:"",resumenCoach:""})),
+        finalizada:false,createdAt:Date.now()
       };
       setCurPersist(nuevaClase);setSelJ(0);setSelH(1);setSubTab("tarjeta");setPhase("active");
     }
@@ -2216,7 +2228,7 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
   </tr></thead><tbody>${hoyoRows}</tbody></table>
   ${notasHoyosConNota?`<h3>Notas del Coach por Hoyo</h3><div class="nota-texto">${notasHoyosConNota}</div>`:""}
   ${j.notaGeneral?`<h3>Observaciones Generales</h3><div class="nota-texto">${j.notaGeneral}</div>`:""}
-  ${clase.resumenCoach?`<h3>Resumen del Coach</h3><div class="nota-texto">${clase.resumenCoach}</div>`:""}
+  ${j.resumenCoach?`<h3>Resumen del Coach</h3><div class="nota-texto">${j.resumenCoach}</div>`:""}
 </div>
 <div class="footer">
   <span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span>
@@ -2281,11 +2293,11 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
           </button>
         </div>
 
-        {/* Resumen coach */}
-        {clase.resumenCoach&&(
+        {/* Resumen coach — por jugador */}
+        {j.resumenCoach&&(
           <div style={S.card}>
-            <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",marginBottom:"8px"}}>RESUMEN COACH</div>
-            <div style={{color:"#f5ead0",fontSize:"12px"}}>{clase.resumenCoach}</div>
+            <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",marginBottom:"8px"}}>RESUMEN COACH · {j.nombre.toUpperCase()}</div>
+            <div style={{color:"#f5ead0",fontSize:"12px"}}>{j.resumenCoach}</div>
           </div>
         )}
       </div>
