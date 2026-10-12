@@ -2161,11 +2161,20 @@ function ClaseEnCancha(){
       return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0);
     }
 
+    function calcNeto(jIdx){
+      const j=clase.jugadores[jIdx];
+      const total=calcTotal(jIdx);
+      if(!total)return null;
+      const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
+      return total-hcpProp;
+    }
+
     function generarPDF(jIdx){
       const j=clase.jugadores[jIdx];
       const total=calcTotal(jIdx);
       const putts=calcPutts(jIdx);
-      const neto=total-(j.hcp||0);
+      const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
+      const neto=total?total-hcpProp:null;
 
       const hoyoRows=Array.from({length:clase.numHoles},(_,i)=>{
         const h=j.holes[i+1]||{};
@@ -2218,7 +2227,7 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
   <h2>Informe de Clase en Cancha</h2>
   <div class="card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${total||"—"}</div></div>
-    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Neto</div><div style="font-size:26px;font-weight:bold;color:#6a4a1a">${total?neto:"—"}</div></div>
+    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Neto (HCP ${hcpProp})</div><div style="font-size:26px;font-weight:bold;color:#6a4a1a">${neto??("—")}</div></div>
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Putts</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${putts||"—"}</div></div>
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Hoyos</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${clase.numHoles}</div></div>
   </div>
@@ -2264,7 +2273,7 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 
         <div style={S.card}>
           <div style={{color:gold,fontSize:"13px",fontWeight:"bold",marginBottom:"4px"}}>{j.nombre} {j.apellido}</div>
-          <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>HCP {j.hcp}</div>
+          <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>HCP {j.hcp}{clase.numHoles!==18?` → ${Math.ceil((j.hcp||0)*clase.numHoles/18)} para ${clase.numHoles} hoyos`:""}</div>
 
           {/* Resumen rápido */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"14px",textAlign:"center"}}>
@@ -2278,28 +2287,26 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
             </div>
             <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
               <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Neto</div>
-              <div style={{color:"#f5ead0",fontSize:"22px",fontWeight:"bold"}}>{total?total-(j.hcp||0):"—"}</div>
+              <div style={{color:"#f5ead0",fontSize:"22px",fontWeight:"bold"}}>{calcNeto(selJ)??("—")}</div>
             </div>
           </div>
 
-          {/* Notas resumen */}
+          {/* Nota general del jugador */}
           {j.notaGeneral&&<div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px",marginBottom:"10px"}}>
             <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"}}>Nota general</div>
             <div style={{color:"#f5ead0",fontSize:"12px"}}>{j.notaGeneral}</div>
           </div>}
 
+          {/* Resumen coach — por jugador */}
+          {j.resumenCoach&&<div style={{background:"#1a2010",border:"1px solid #3a5020",borderRadius:"6px",padding:"10px",marginBottom:"10px"}}>
+            <div style={{color:"#8aba50",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"}}>Resumen Coach</div>
+            <div style={{color:"#f5ead0",fontSize:"12px"}}>{j.resumenCoach}</div>
+          </div>}
+
           <button style={{...S.btn("p"),width:"100%"}} onClick={()=>generarPDF(selJ)}>
-            ↓ Descargar Informe (HTML)
+            ↓ Descargar Informe del Jugador
           </button>
         </div>
-
-        {/* Resumen coach — por jugador */}
-        {j.resumenCoach&&(
-          <div style={S.card}>
-            <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",marginBottom:"8px"}}>RESUMEN COACH · {j.nombre.toUpperCase()}</div>
-            <div style={{color:"#f5ead0",fontSize:"12px"}}>{j.resumenCoach}</div>
-          </div>
-        )}
       </div>
     );
   }
