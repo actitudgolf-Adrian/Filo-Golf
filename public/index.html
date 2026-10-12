@@ -2205,14 +2205,19 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
           </div>
         </div>
 
-        {/* Nota general — editable */}
+        {/* Nota general — editable + audio */}
         <div style={{marginBottom:"10px"}}>
-          <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"}}>
-            Nota general del jugador
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Nota general del jugador</div>
+            {onUpdate&&<button onClick={()=>startVoiceReporte(selJ,"notaGeneral")} disabled={recStatus!=="idle"} style={{
+              background:recStatus==="notaGeneral"?"#8B1A1A":"#1a1612",
+              border:"1px solid #5a4a20",color:"#b09050",borderRadius:"6px",padding:"4px 9px",cursor:"pointer",fontSize:"11px"
+            }}>{recStatus==="notaGeneral"?"🔴":"🎤"}</button>}
           </div>
           <textarea value={j.notaGeneral||""} onChange={e=>updJugador(selJ,jj=>{jj.notaGeneral=e.target.value;})}
             placeholder="Observaciones del jugador..."
-            style={{...S.inp,width:"100%",minHeight:"64px",resize:"vertical",fontSize:"12px"}}/>
+            style={{...S.inp,width:"100%",minHeight:"64px",resize:"vertical",fontSize:"12px"}}
+            readOnly={!onUpdate}/>
         </div>
 
         {/* Resumen coach — editable + audio */}
