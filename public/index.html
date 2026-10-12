@@ -2042,6 +2042,203 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
   );
 }
 
+// ─── REPORTE CLASE ────────────────────────────────────────────────────────────
+function ReporteClase({clase,onBack,onUpdate}){
+  const [selJ,setSelJ]=useState(0);
+  const [recStatus,setRecStatus]=useState("idle");
+
+  function calcTotal(jIdx){
+    return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0)||0;
+  }
+  function calcPutts(jIdx){
+    return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0)||0;
+  }
+  function calcNeto(jIdx){
+    const total=calcTotal(jIdx);
+    if(!total)return null;
+    const hcpProp=Math.ceil((clase.jugadores[jIdx].hcp||0)*clase.numHoles/18);
+    return total-hcpProp;
+  }
+
+  function updJugador(jIdx,fn){
+    if(!onUpdate)return;
+    const next=JSON.parse(JSON.stringify(clase));
+    fn(next.jugadores[jIdx]);
+    onUpdate(next);
+  }
+
+  function startVoiceReporte(jIdx,campo){
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+      alert("⚠️ Reconocimiento de voz no disponible.");return;
+    }
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const rec=new SR();
+    rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
+    setRecStatus(campo);
+    rec.onresult=e=>{
+      const txt=e.results[0][0].transcript;
+      updJugador(jIdx,j=>{j[campo]=(j[campo]||"")+(txt?" "+txt:"");});
+      setRecStatus("idle");
+    };
+    rec.onerror=()=>setRecStatus("idle");
+    rec.start();
+  }
+
+  function generarPDF(jIdx){
+    const j=clase.jugadores[jIdx];
+    const total=calcTotal(jIdx);
+    const putts=calcPutts(jIdx);
+    const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
+    const neto=total?total-hcpProp:null;
+
+    const hoyoRows=Array.from({length:clase.numHoles},(_,i)=>{
+      const h=j.holes[i+1]||{};
+      const nota=j.notas[i+1]||"";
+      return `<tr>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center">${i+1}</td>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.par||"—"}</td>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:bold">${h.shots||"—"}</td>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.putts||"—"}</td>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.chips||"—"}</td>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.bunker||"—"}</td>
+        ${nota?`<td style="border:1px solid #ddd;padding:6px;font-size:11px;color:#555">${nota}</td>`:`<td style="border:1px solid #ddd;padding:6px;color:#ccc">—</td>`}
+      </tr>`;
+    }).join("");
+
+    const notasHoyosConNota=Array.from({length:clase.numHoles},(_,i)=>{
+      const n=j.notas[i+1];
+      return n?`<div style="margin-bottom:12px"><strong style="color:#6a4a1a">Hoyo ${i+1}:</strong> ${n}</div>`:"";
+    }).join("");
+
+    const html=`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
+<title>Informe Filo Golf · ${j.nombre} ${j.apellido}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Georgia,'Times New Roman',serif;color:#1a1612}
+.header,.footer{background:#1a1612;color:#C9A84C;padding:18px 28px;display:flex;justify-content:space-between;align-items:center}
+.header .logo{font-size:26px;font-weight:bold;letter-spacing:2px}
+.header .sub{font-size:11px;color:#b09050;letter-spacing:2px}
+.footer{font-size:11px;color:#b09050;justify-content:center}
+.body{background:#fff;padding:24px 28px}
+h2{color:#1a1612;font-size:16px;margin-bottom:14px;border-bottom:1px solid #ddd;padding-bottom:6px}
+h3{color:#6a4a1a;font-size:13px;margin:16px 0 8px;letter-spacing:1px;text-transform:uppercase}
+.card{background:#f9f6f0;border:1px solid #e8dcc8;border-radius:6px;padding:14px;margin-bottom:16px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:11px;letter-spacing:1px}
+.nota-texto{font-size:12px;color:#333;line-height:1.6;background:#f9f6f0;padding:12px;border-radius:4px;border-left:3px solid #C9A84C}
+.nota-coach{font-size:12px;color:#333;line-height:1.6;background:#f0f6e8;padding:12px;border-radius:4px;border-left:3px solid #6a9a30}
+</style></head>
+<body>
+<div class="header">
+  <div><div class="logo">φ Filo Golf</div><div class="sub">Clase en Cancha · ${clase.fecha}</div></div>
+  <div style="text-align:right">
+    <div style="font-size:13px">${j.nombre} ${j.apellido}</div>
+    <div style="font-size:10px;color:#b09050">HCP ${j.hcp} · ${clase.courseName}</div>
+  </div>
+</div>
+<div class="body">
+  <h2>Informe de Clase en Cancha</h2>
+  <div class="card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
+    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${total||"—"}</div></div>
+    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Neto (HCP ${hcpProp})</div><div style="font-size:26px;font-weight:bold;color:#6a4a1a">${neto??("—")}</div></div>
+    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Putts</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${putts||"—"}</div></div>
+    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Hoyos</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${clase.numHoles}</div></div>
+  </div>
+  <h3>Tarjeta de Puntaje</h3>
+  <table><thead><tr>
+    <th>Hoyo</th><th>Par</th><th>Golpes</th><th>Putts</th><th>Chips</th><th>Bunker</th><th>Nota Coach</th>
+  </tr></thead><tbody>${hoyoRows}</tbody></table>
+  ${notasHoyosConNota?`<h3>Notas del Coach por Hoyo</h3><div class="nota-texto">${notasHoyosConNota}</div>`:""}
+  ${j.notaGeneral?`<h3>Observaciones del Jugador</h3><div class="nota-texto">${j.notaGeneral}</div>`:""}
+  ${j.resumenCoach?`<h3>Resumen del Coach</h3><div class="nota-coach">${j.resumenCoach}</div>`:""}
+</div>
+<div class="footer"><span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span></div>
+</body></html>`;
+
+    const blob=new Blob([html],{type:"text/html"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`FiloGolf_${j.apellido}_${clase.fecha}.html`;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+  }
+
+  const j=clase.jugadores[selJ];
+  const total=calcTotal(selJ);
+  const putts=calcPutts(selJ);
+  const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
+
+  return(
+    <div style={S.page}>
+      <button style={{...S.btn("g"),marginBottom:"14px"}} onClick={onBack}>← Volver</button>
+      <div style={S.h2}>Clase: {clase.fecha} · {clase.courseName}</div>
+      <div style={{color:"#b09050",fontSize:"11px",marginBottom:"14px"}}>{clase.jugadores.length} jugador{clase.jugadores.length!==1?"es":""}</div>
+
+      {/* Selector jugador */}
+      <div style={{display:"flex",gap:"5px",marginBottom:"14px",flexWrap:"wrap"}}>
+        {clase.jugadores.map((jj,i)=>(
+          <button key={i} style={{...S.nb(selJ===i),flex:1}} onClick={()=>setSelJ(i)}>
+            {jj.nombre} {jj.apellido}
+          </button>
+        ))}
+      </div>
+
+      <div style={S.card}>
+        <div style={{color:gold,fontSize:"13px",fontWeight:"bold",marginBottom:"4px"}}>{j.nombre} {j.apellido}</div>
+        <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>
+          HCP {j.hcp}{clase.numHoles!==18?` → ${hcpProp} para ${clase.numHoles} hoyos`:""}
+        </div>
+
+        {/* Números */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"14px",textAlign:"center"}}>
+          <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
+            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Total</div>
+            <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{total||"—"}</div>
+          </div>
+          <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
+            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Putts</div>
+            <div style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold"}}>{putts||"—"}</div>
+          </div>
+          <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
+            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Neto</div>
+            <div style={{color:"#f5ead0",fontSize:"22px",fontWeight:"bold"}}>{calcNeto(selJ)??("—")}</div>
+          </div>
+        </div>
+
+        {/* Nota general — editable */}
+        <div style={{marginBottom:"10px"}}>
+          <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"}}>
+            Nota general del jugador
+          </div>
+          <textarea value={j.notaGeneral||""} onChange={e=>updJugador(selJ,jj=>{jj.notaGeneral=e.target.value;})}
+            placeholder="Observaciones del jugador..."
+            style={{...S.inp,width:"100%",minHeight:"64px",resize:"vertical",fontSize:"12px"}}/>
+        </div>
+
+        {/* Resumen coach — editable + audio */}
+        <div style={{marginBottom:"14px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+            <div style={{color:"#8aba50",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Resumen Coach</div>
+            {onUpdate&&<button onClick={()=>startVoiceReporte(selJ,"resumenCoach")} disabled={recStatus!=="idle"} style={{
+              background:recStatus==="resumenCoach"?"#8B1A1A":"#1a1612",
+              border:"1px solid #3a5020",color:"#8aba50",borderRadius:"6px",padding:"4px 9px",cursor:"pointer",fontSize:"11px"
+            }}>{recStatus==="resumenCoach"?"🔴":"🎤"}</button>}
+          </div>
+          <textarea value={j.resumenCoach||""} onChange={e=>updJugador(selJ,jj=>{jj.resumenCoach=e.target.value;})}
+            placeholder="Resumen del coach para este jugador..."
+            style={{...S.inp,width:"100%",minHeight:"64px",resize:"vertical",fontSize:"12px",
+              background:"#182010",border:"2px solid #3a5020"}}
+            readOnly={!onUpdate}/>
+        </div>
+
+        <button style={{...S.btn("p"),width:"100%"}} onClick={()=>generarPDF(selJ)}>
+          ↓ Descargar Informe del Jugador
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── CLASE EN CANCHA ──────────────────────────────────────────────────────────
 function ClaseEnCancha(){
   const CLASE_LS="coach:clases";
@@ -2150,167 +2347,6 @@ function ClaseEnCancha(){
 
   // ── Clase activa — delegada a componente externo ClaseActivaPanel ──────────
 
-  // ── Reporte / PDF ─────────────────────────────────────────────────────────
-  function Reporte({clase,onBack}){
-    const [selJ,setSelJ]=useState(0);
-
-    function calcTotal(jIdx){
-      return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0);
-    }
-    function calcPutts(jIdx){
-      return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0);
-    }
-
-    function calcNeto(jIdx){
-      const j=clase.jugadores[jIdx];
-      const total=calcTotal(jIdx);
-      if(!total)return null;
-      const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
-      return total-hcpProp;
-    }
-
-    function generarPDF(jIdx){
-      const j=clase.jugadores[jIdx];
-      const total=calcTotal(jIdx);
-      const putts=calcPutts(jIdx);
-      const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
-      const neto=total?total-hcpProp:null;
-
-      const hoyoRows=Array.from({length:clase.numHoles},(_,i)=>{
-        const h=j.holes[i+1]||{};
-        const nota=j.notas[i+1]||"";
-        return `<tr>
-          <td style="border:1px solid #ddd;padding:6px;text-align:center">${i+1}</td>
-          <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.par||"—"}</td>
-          <td style="border:1px solid #ddd;padding:6px;text-align:center;font-weight:bold">${h.shots||"—"}</td>
-          <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.putts||"—"}</td>
-          <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.chips||"—"}</td>
-          <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.bunker||"—"}</td>
-          ${nota?`<td style="border:1px solid #ddd;padding:6px;font-size:11px;color:#555">${nota}</td>`:`<td style="border:1px solid #ddd;padding:6px;color:#ccc">—</td>`}
-        </tr>`;
-      }).join("");
-
-      const notasHoyosConNota=Array.from({length:clase.numHoles},(_,i)=>{
-        const n=j.notas[i+1];
-        return n?`<div style="margin-bottom:12px"><strong style="color:#6a4a1a">Hoyo ${i+1}:</strong> ${n}</div>`:"";
-      }).join("");
-
-      const html=`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
-<title>Informe Filo Golf · ${j.nombre} ${j.apellido}</title>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Georgia,'Times New Roman',serif;color:#1a1612}
-.header,.footer{background:#1a1612;color:#C9A84C;padding:18px 28px;display:flex;justify-content:space-between;align-items:center}
-.header .logo{font-size:26px;font-weight:bold;letter-spacing:2px}
-.header .sub{font-size:11px;color:#b09050;letter-spacing:2px}
-.footer{font-size:11px;color:#b09050;justify-content:center}
-.body{background:#fff;padding:24px 28px}
-h2{color:#1a1612;font-size:16px;margin-bottom:14px;border-bottom:1px solid #ddd;padding-bottom:6px}
-h3{color:#6a4a1a;font-size:13px;margin:16px 0 8px;letter-spacing:1px;text-transform:uppercase}
-.card{background:#f9f6f0;border:1px solid #e8dcc8;border-radius:6px;padding:14px;margin-bottom:16px}
-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
-th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:11px;letter-spacing:1px}
-.nota-texto{font-size:12px;color:#333;line-height:1.6;background:#f9f6f0;padding:12px;border-radius:4px;border-left:3px solid #C9A84C}
-</style></head>
-<body>
-<div class="header">
-  <div>
-    <div class="logo">φ Filo Golf</div>
-    <div class="sub">Clase en Cancha · ${clase.fecha}</div>
-  </div>
-  <div style="text-align:right">
-    <div style="font-size:13px">${j.nombre} ${j.apellido}</div>
-    <div style="font-size:10px;color:#b09050">HCP ${j.hcp} · ${clase.courseName}</div>
-  </div>
-</div>
-<div class="body">
-  <h2>Informe de Clase en Cancha</h2>
-  <div class="card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
-    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${total||"—"}</div></div>
-    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Neto (HCP ${hcpProp})</div><div style="font-size:26px;font-weight:bold;color:#6a4a1a">${neto??("—")}</div></div>
-    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Putts</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${putts||"—"}</div></div>
-    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Hoyos</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${clase.numHoles}</div></div>
-  </div>
-  <h3>Tarjeta de Puntaje</h3>
-  <table><thead><tr>
-    <th>Hoyo</th><th>Par</th><th>Golpes</th><th>Putts</th><th>Chips</th><th>Bunker</th><th>Nota Coach</th>
-  </tr></thead><tbody>${hoyoRows}</tbody></table>
-  ${notasHoyosConNota?`<h3>Notas del Coach por Hoyo</h3><div class="nota-texto">${notasHoyosConNota}</div>`:""}
-  ${j.notaGeneral?`<h3>Observaciones Generales</h3><div class="nota-texto">${j.notaGeneral}</div>`:""}
-  ${j.resumenCoach?`<h3>Resumen del Coach</h3><div class="nota-texto">${j.resumenCoach}</div>`:""}
-</div>
-<div class="footer">
-  <span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span>
-</div>
-</body></html>`;
-
-      const blob=new Blob([html],{type:"text/html"});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement("a");
-      a.href=url;a.download=`FiloGolf_${j.apellido}_${clase.fecha}.html`;
-      document.body.appendChild(a);a.click();
-      setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
-    }
-
-    const j=clase.jugadores[selJ];
-    const total=calcTotal(selJ);
-    const putts=calcPutts(selJ);
-
-    return(
-      <div style={S.page}>
-        <button style={{...S.btn("g"),marginBottom:"14px"}} onClick={onBack}>← Volver</button>
-        <div style={S.h2}>Clase: {clase.fecha} · {clase.courseName}</div>
-        <div style={{color:"#b09050",fontSize:"11px",marginBottom:"14px"}}>{clase.jugadores.length} jugador{clase.jugadores.length!==1?"es":""}</div>
-
-        {/* Selector jugador para el informe */}
-        <div style={{display:"flex",gap:"5px",marginBottom:"14px",flexWrap:"wrap"}}>
-          {clase.jugadores.map((jj,i)=>(
-            <button key={i} style={{...S.nb(selJ===i),flex:1}} onClick={()=>setSelJ(i)}>
-              {jj.nombre} {jj.apellido}
-            </button>
-          ))}
-        </div>
-
-        <div style={S.card}>
-          <div style={{color:gold,fontSize:"13px",fontWeight:"bold",marginBottom:"4px"}}>{j.nombre} {j.apellido}</div>
-          <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>HCP {j.hcp}{clase.numHoles!==18?` → ${Math.ceil((j.hcp||0)*clase.numHoles/18)} para ${clase.numHoles} hoyos`:""}</div>
-
-          {/* Resumen rápido */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"14px",textAlign:"center"}}>
-            <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
-              <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Total</div>
-              <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{total||"—"}</div>
-            </div>
-            <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
-              <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Putts</div>
-              <div style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold"}}>{putts||"—"}</div>
-            </div>
-            <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
-              <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Neto</div>
-              <div style={{color:"#f5ead0",fontSize:"22px",fontWeight:"bold"}}>{calcNeto(selJ)??("—")}</div>
-            </div>
-          </div>
-
-          {/* Nota general del jugador */}
-          {j.notaGeneral&&<div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px",marginBottom:"10px"}}>
-            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"}}>Nota general</div>
-            <div style={{color:"#f5ead0",fontSize:"12px"}}>{j.notaGeneral}</div>
-          </div>}
-
-          {/* Resumen coach — por jugador */}
-          {j.resumenCoach&&<div style={{background:"#1a2010",border:"1px solid #3a5020",borderRadius:"6px",padding:"10px",marginBottom:"10px"}}>
-            <div style={{color:"#8aba50",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"4px"}}>Resumen Coach</div>
-            <div style={{color:"#f5ead0",fontSize:"12px"}}>{j.resumenCoach}</div>
-          </div>}
-
-          <button style={{...S.btn("p"),width:"100%"}} onClick={()=>generarPDF(selJ)}>
-            ↓ Descargar Informe del Jugador
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // ── Lista / historial ───────────────────────────────────────────────────────
   if(phase==="setup")return <SetupClase/>;
   if(phase==="active")return <ClaseActivaPanel
@@ -2331,9 +2367,15 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
       setCurPersist(null); // limpia el activo — ya quedó guardado en historial
       setPhase("list");setCur(null);
     }
-    return <Reporte clase={cur} onBack={guardarYSalir}/>;
+    return <ReporteClase clase={cur} onBack={guardarYSalir} onUpdate={next=>{
+      const arr=[...clases.filter(c=>c.id!==next.id),next];
+      saveClases(arr);setCurPersist(next);setCur(next);
+    }}/>;
   }
-  if(selClase)return <Reporte clase={selClase} onBack={()=>setSelClase(null)}/>;
+  if(selClase)return <ReporteClase clase={selClase} onBack={()=>setSelClase(null)} onUpdate={next=>{
+    const arr=[...clases.filter(c=>c.id!==next.id),next];
+    saveClases(arr);setSelClase(next);
+  }}/>;
 
   // Historial alfabético
   const byAlumno={};
