@@ -1877,6 +1877,11 @@ function ClaseEnCancha(){
   const [cur,setCur]=useState(()=>lsGet(CLASE_ACTIVE_LS)||null);
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
+  // Estado de navegación de clase activa — a nivel padre para no resetearse al re-render
+  const [selJ,setSelJ]=useState(0);
+  const [selH,setSelH]=useState(1);
+  const [subTab,setSubTab]=useState("tarjeta");
+  const [recStatus,setRecStatus]=useState("idle");
 
   function saveClases(arr){setClases(arr);lsSet(CLASE_LS,arr);}
 
@@ -1910,7 +1915,7 @@ function ClaseEnCancha(){
         jugadores:js.map(j=>({nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,holes:{},notas:{},notaGeneral:""})),
         resumenCoach:"",finalizada:false,createdAt:Date.now()
       };
-      setCurPersist(nuevaClase);setPhase("active");
+      setCurPersist(nuevaClase);setSelJ(0);setSelH(1);setSubTab("tarjeta");setPhase("active");
     }
 
     return(
@@ -1968,10 +1973,7 @@ function ClaseEnCancha(){
   // ── Clase activa ────────────────────────────────────────────────────────────
   function ClaseActiva(){
     const [clase,setClase]=useState(cur);
-    const [selJ,setSelJ]=useState(0);
-    const [selH,setSelH]=useState(1);
-    const [recStatus,setRecStatus]=useState("idle"); // idle|recording|done|error
-    const [subTab,setSubTab]=useState("tarjeta"); // tarjeta|notas
+    // selJ, selH, subTab, recStatus viven en el padre para no resetearse
 
     function updClase(fn){
       const next={...clase};fn(next);
