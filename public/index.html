@@ -1865,7 +1865,33 @@ function CoachPassReset({username}){
 }
 
 // ─── CLASE ACTIVA PANEL — componente independiente para evitar re-mount ───────
-function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubTab,recStatus,setRecStatus,onUpdate,onFinalizar,onGuardar}){
+// Colores por jugador para modo claro/oscuro
+const J_COLORS=[
+  {bg:"#1a2a3a",border:"#4a7aaa",text:"#7ab4ee",dot:"#4a90d9"},  // azul
+  {bg:"#2a1a2a",border:"#8a4aaa",text:"#c47aee",dot:"#9a50c0"},  // violeta
+  {bg:"#1a2a1a",border:"#4a8a4a",text:"#7acd7a",dot:"#50a050"},  // verde
+  {bg:"#2a2a1a",border:"#9a8a2a",text:"#d4c04a",dot:"#b09030"},  // amarillo
+];
+const J_COLORS_LIGHT=[
+  {bg:"#dbeeff",border:"#4a7aaa",text:"#1a4a7a",dot:"#4a90d9"},
+  {bg:"#eedbe8",border:"#8a4aaa",text:"#5a1a7a",dot:"#9a50c0"},
+  {bg:"#dbeedd",border:"#4a8a4a",text:"#1a5a1a",dot:"#50a050"},
+  {bg:"#f5f0d0",border:"#9a8a2a",text:"#5a4a00",dot:"#b09030"},
+];
+
+function voiceBtn(status,key,onClick,light){
+  const rec=status===key;
+  return(
+    <button onClick={onClick} disabled={status!=="idle"} style={{
+      background:rec?(light?"#c04040":"#8B1A1A"):(light?"#e8e0d0":"#1a1612"),
+      border:`1px solid ${rec?"#c04040":"#5a4a20"}`,
+      color:rec?(light?"#fff":"#ff8080"):(light?"#7a5010":"#b09050"),
+      borderRadius:"6px",padding:"5px 10px",cursor:"pointer",fontSize:"12px",flexShrink:0
+    }}>{rec?"🔴":"🎤"}</button>
+  );
+}
+
+function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubTab,recStatus,setRecStatus,onUpdate,onFinalizar,onGuardar,lightMode,setLightMode}){
 
   function updClase(fn){
     const next=JSON.parse(JSON.stringify(clase));fn(next);onUpdate(next);
@@ -1876,36 +1902,48 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
       c.jugadores[jIdx].holes[hNum][k]=v;
     });
   }
-  function updNota(jIdx,hNum,texto){
+  // updNota: campo puede ser "notaGeneral","resumenCoach", o zona mental "zona_N", o "notaLibre"
+  function updNotaHoyo(jIdx,hNum,campo,texto){
     updClase(c=>{
-      if(hNum===0)c.jugadores[jIdx].notaGeneral=texto;
-      else{c.jugadores[jIdx].notas[hNum]=texto;}
+      if(!c.jugadores[jIdx].notasHoyo)c.jugadores[jIdx].notasHoyo={};
+      if(!c.jugadores[jIdx].notasHoyo[hNum])c.jugadores[jIdx].notasHoyo[hNum]={};
+      c.jugadores[jIdx].notasHoyo[hNum][campo]=texto;
     });
   }
-  function startVoice(jIdx,hNum){
+  function updPlanZona(jIdx,zona,texto){
+    updClase(c=>{
+      if(!c.jugadores[jIdx].planJuego)c.jugadores[jIdx].planJuego={};
+      c.jugadores[jIdx].planJuego[zona]=texto;
+    });
+  }
+  function startVoice(jIdx,campo,extra,modo){
     if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
-      alert("⚠️ Reconocimiento de voz no disponible. Escribí la nota a mano.");return;
+      alert("⚠️ Reconocimiento de voz no disponible.");return;
     }
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec=new SR();
     rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
-    setRecStatus("recording");
+    // recKey debe coincidir con lo que pasa voiceBtn
+    let recKey;
+    if(modo==="plan"){recKey=`plan_eg_${jIdx}`; if(campo!=="estrategiaGlobal")recKey=`plan_z${campo.replace("zona_plan_","")}_${jIdx}`;}
+    else if(extra!==undefined&&extra!==null){recKey=campo==="notaLibre"?`libre_${jIdx}_${extra}`:`z${campo.replace("zona_","")}_${jIdx}_${extra}`;}
+    else recKey=`${campo==="resumenCoach"?"rc":campo==="notaGeneral"?"ng":campo}_${jIdx}`;
+    setRecStatus(recKey);
     rec.onresult=e=>{
       const txt=e.results[0][0].transcript;
-      if(hNum===-1){
-        // resumen coach del jugador
-        const prev=clase.jugadores[jIdx].resumenCoach||"";
-        updClase(c=>{c.jugadores[jIdx].resumenCoach=prev+(txt?" "+txt:"");});
-      } else {
-        const prev=hNum===0?clase.jugadores[jIdx].notaGeneral:(clase.jugadores[jIdx].notas[hNum]||"");
-        updNota(jIdx,hNum,prev+(txt?" "+txt:""));
+      if(modo==="plan"){
+        updPlanZona(jIdx,campo,(clase.jugadores[jIdx].planJuego?.[campo]||"")+(txt?" "+txt:""));
+      } else if(extra!==undefined&&extra!==null){
+        const prev=clase.jugadores[jIdx].notasHoyo?.[extra]?.[campo]||"";
+        updNotaHoyo(jIdx,extra,campo,prev+(txt?" "+txt:""));
+      } else if(campo==="resumenCoach"){
+        updClase(c=>{c.jugadores[jIdx].resumenCoach=(c.jugadores[jIdx].resumenCoach||"")+(txt?" "+txt:"");});
+      } else if(campo==="notaGeneral"){
+        updClase(c=>{c.jugadores[jIdx].notaGeneral=(c.jugadores[jIdx].notaGeneral||"")+(txt?" "+txt:"");});
       }
       setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
     };
-    rec.onerror=e=>{
-      if(e.error==="network"||e.error==="no-speech")alert("⚠️ Sin señal o sin voz. Escribí la nota.");
-      setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);
-    };
+    rec.onerror=()=>{setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);};
     rec.start();
   }
   function finalizar(){
@@ -1915,137 +1953,265 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     const next=JSON.parse(JSON.stringify(clase));
     const arr=[...clases.filter(c=>c.id!==next.id),next];
     onGuardar(next,arr);
-    alert("✓ Clase guardada. Si salís de la app, al volver la encontrás donde la dejaste.");
+    alert("✓ Clase guardada. Podés salir y al volver la encontrás donde la dejaste.");
   }
+
+  const L=lightMode;
+  const bg=L?"#f5f0e8":"#0f0d0a";
+  const cardBg=L?"#fff":"#1c1810";
+  const cardBorder=L?"#d8cbb0":"#5a4a20";
+  const txt=L?"#2a1a08":"#f5ead0";
+  const txtMuted=L?"#7a5a20":"#b09050";
+  const inpBg=L?"#f0e8d8":"#2a2318";
+  const inpBorder=L?"#c0a060":"#7a6030";
+
+  const SC={
+    page:{minHeight:"100vh",background:bg,color:txt,padding:"18px 14px",maxWidth:"860px",margin:"0 auto"},
+    card:{background:cardBg,border:`1px solid ${cardBorder}`,borderRadius:"6px",padding:"16px",marginBottom:"12px"},
+    inp:{background:inpBg,border:`2px solid ${inpBorder}`,borderRadius:"4px",color:txt,padding:"10px 11px",fontSize:"15px",width:"100%",boxSizing:"border-box",outline:"none"},
+    lbl:{fontSize:"12px",color:txtMuted,letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"5px"},
+    h2:{fontSize:"15px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"14px",borderBottom:`1px solid ${cardBorder}`,paddingBottom:"7px"},
+  };
 
   const j=clase.jugadores[selJ];
   const hNum=selH;
+  const jCol=L?J_COLORS_LIGHT[selJ%4]:J_COLORS[selJ%4];
 
   return(
-    <div style={S.page}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-        <div style={S.h2}>Clase · {clase.fecha}</div>
-        <div style={{display:"flex",gap:"6px"}}>
-          <button style={{...S.btn("g"),fontSize:"10px",padding:"5px 8px"}} onClick={guardarBorrador}>💾 Guardar</button>
-          <button style={{...S.btn("p"),fontSize:"10px",padding:"5px 8px"}} onClick={finalizar}>Finalizar →</button>
+    <div style={SC.page}>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",flexWrap:"wrap",gap:"6px"}}>
+        <div style={SC.h2}>Clase · {clase.fecha}</div>
+        <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+          <button style={{background:L?"#e0d8c8":"#2d2720",color:L?"#5a3a10":"#f5ead0",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"5px 9px",fontSize:"11px",cursor:"pointer"}}
+            onClick={()=>setLightMode(!L)}>{L?"🌙 Oscuro":"☀️ Claro"}</button>
+          <button style={{background:L?"#e0d8c8":"#2d2720",color:L?"#5a3a10":"#f5ead0",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"5px 9px",fontSize:"11px",cursor:"pointer"}} onClick={guardarBorrador}>💾 Guardar</button>
+          <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"5px 9px",fontSize:"11px",cursor:"pointer",fontWeight:"bold"}} onClick={finalizar}>Finalizar →</button>
         </div>
       </div>
 
-      {/* Selector jugador */}
+      {/* Selector jugador con color */}
       <div style={{display:"flex",gap:"5px",marginBottom:"10px",flexWrap:"wrap"}}>
-        {clase.jugadores.map((jj,i)=>(
-          <button key={i} style={{...S.nb(selJ===i),flex:1,minWidth:"70px"}} onClick={()=>setSelJ(i)}>
-            {jj.nombre}
-          </button>
-        ))}
-      </div>
-
-      {/* Sub-tabs */}
-      <div style={{display:"flex",gap:"5px",marginBottom:"10px"}}>
-        {[["tarjeta","Tarjeta"],["notas","Notas"]].map(([t,l])=>(
-          <button key={t} style={S.nb(subTab===t)} onClick={()=>setSubTab(t)}>{l}</button>
-        ))}
-      </div>
-
-      {/* Selector hoyo */}
-      <div style={{display:"flex",gap:"4px",marginBottom:"12px",flexWrap:"wrap"}}>
-        {Array.from({length:clase.numHoles},(_,i)=>i+1).map(h=>{
-          const hd=clase.jugadores[selJ].holes[h]||{};
-          const filled=!!hd.shots;
+        {clase.jugadores.map((jj,i)=>{
+          const jc=L?J_COLORS_LIGHT[i%4]:J_COLORS[i%4];
+          const act=selJ===i;
           return(
-            <button key={h} onClick={()=>setSelH(h)} style={{
-              minWidth:"32px",padding:"5px 3px",fontSize:"11px",fontWeight:"bold",
-              background:selH===h?"#C9A84C":(filled?"#2a3a1a":"#1a1612"),
-              color:selH===h?"#1a1612":(filled?"#6a9a50":"#b09050"),
-              border:`1px solid ${selH===h?"#C9A84C":filled?"#3a6a2a":"#3a3020"}`,
-              borderRadius:"5px",cursor:"pointer"
-            }}>{h}</button>
+            <button key={i} onClick={()=>setSelJ(i)} style={{
+              flex:1,minWidth:"70px",padding:"7px 5px",fontSize:"13px",fontWeight:act?"bold":"normal",
+              background:act?jc.bg:(L?"#f0e8d8":"#1a1612"),
+              color:act?jc.text:txtMuted,
+              border:`2px solid ${act?jc.border:cardBorder}`,
+              borderRadius:"6px",cursor:"pointer",
+              boxShadow:act?`0 0 0 1px ${jc.dot}`:"none"
+            }}>
+              <span style={{display:"block",width:"8px",height:"8px",borderRadius:"50%",background:act?jc.dot:"transparent",display:"inline-block",marginRight:"5px"}}></span>
+              {jj.nombre}
+            </button>
           );
         })}
       </div>
 
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:"5px",marginBottom:"10px",flexWrap:"wrap"}}>
+        {[["tarjeta","Tarjeta"],["anotaciones","Anotaciones"],["plan","Plan Hoyo 0"],["resumen","Resumen"]].map(([t,l])=>(
+          <button key={t} style={{
+            background:subTab===t?gold:(L?"#e8e0d0":"transparent"),
+            color:subTab===t?"#1a1612":(L?"#5a3a10":gold),
+            border:`1px solid ${subTab===t?gold:cardBorder}`,
+            borderRadius:"3px",padding:"6px 11px",fontSize:"11px",letterSpacing:"1px",textTransform:"uppercase",cursor:"pointer"
+          }} onClick={()=>setSubTab(t)}>{l}</button>
+        ))}
+      </div>
+
+      {/* Selector hoyo */}
+      {subTab!=="plan"&&(
+        <div style={{display:"flex",gap:"4px",marginBottom:"12px",flexWrap:"wrap"}}>
+          {Array.from({length:clase.numHoles},(_,i)=>i+1).map(h=>{
+            const hd=j.holes[h]||{};
+            const filled=!!hd.shots;
+            return(
+              <button key={h} onClick={()=>setSelH(h)} style={{
+                minWidth:"32px",padding:"6px 3px",fontSize:"12px",fontWeight:"bold",
+                background:selH===h?gold:(filled?(L?"#c8e8c8":"#2a3a1a"):(L?"#e8e0d0":"#1a1612")),
+                color:selH===h?"#1a1612":(filled?(L?"#1a5a1a":"#6a9a50"):(L?"#7a5a20":"#b09050")),
+                border:`1px solid ${selH===h?gold:filled?(L?"#7aba7a":"#3a6a2a"):(L?"#c0a060":"#3a3020")}`,
+                borderRadius:"5px",cursor:"pointer"
+              }}>{h}</button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── TARJETA ── */}
       {subTab==="tarjeta"&&(()=>{
         const hd=j.holes[hNum]||{};
         return(
-          <div style={S.card}>
-            <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",marginBottom:"10px"}}>HOYO {hNum} · {j.nombre} {j.apellido}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",marginBottom:"8px"}}>
-              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>GOLPES</div>
-                <input type="number" min="1" max="20" value={hd.shots||""} onChange={e=>updHole(selJ,hNum,"shots",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="—"/></div>
-              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>PUTTS</div>
-                <input type="number" min="0" max="10" value={hd.putts||""} onChange={e=>updHole(selJ,hNum,"putts",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="—"/></div>
-              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>PAR</div>
-                <select value={hd.par||""} onChange={e=>updHole(selJ,hNum,"par",e.target.value)} style={{...S.inp,width:"100%"}}>
+          <div style={SC.card}>
+            <div style={{color:jCol.text,fontSize:"13px",letterSpacing:"2px",marginBottom:"12px",fontWeight:"bold"}}>HOYO {hNum} · {j.nombre} {j.apellido}</div>
+            {/* Fila 1: golpes, putts, par */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"9px",marginBottom:"9px"}}>
+              <div><div style={SC.lbl}>GOLPES</div>
+                <input type="number" min="1" max="20" value={hd.shots||""} onChange={e=>updHole(selJ,hNum,"shots",e.target.value)} style={SC.inp} placeholder="—"/></div>
+              <div><div style={SC.lbl}>PUTTS</div>
+                <input type="number" min="0" max="10" value={hd.putts||""} onChange={e=>updHole(selJ,hNum,"putts",e.target.value)} style={SC.inp} placeholder="—"/></div>
+              <div><div style={SC.lbl}>PAR</div>
+                <select value={hd.par||""} onChange={e=>updHole(selJ,hNum,"par",e.target.value)} style={SC.inp}>
                   <option value="">—</option>{[3,4,5].map(p=><option key={p} value={p}>{p}</option>)}
                 </select></div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}}>
-              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>CHIPS</div>
-                <input type="number" min="0" max="10" value={hd.chips||""} onChange={e=>updHole(selJ,hNum,"chips",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
-              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>BUNKER</div>
-                <input type="number" min="0" max="10" value={hd.bunker||""} onChange={e=>updHole(selJ,hNum,"bunker",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
-              <div><div style={{color:"#b09050",fontSize:"9px",marginBottom:"3px"}}>1er PUTT (yds)</div>
-                <input type="number" min="0" max="100" value={hd.distPutt1||""} onChange={e=>updHole(selJ,hNum,"distPutt1",e.target.value)} style={{...S.inp,width:"100%"}} placeholder="0"/></div>
+            {/* Fila 2: dist, chips, bunker */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"9px",marginBottom:"9px"}}>
+              <div><div style={SC.lbl}>DISTANCIA</div>
+                <input type="number" min="0" max="600" value={hd.dist||""} onChange={e=>updHole(selJ,hNum,"dist",e.target.value)} style={SC.inp} placeholder="yds"/></div>
+              <div><div style={SC.lbl}>CHIPS</div>
+                <input type="number" min="0" max="10" value={hd.chips||""} onChange={e=>updHole(selJ,hNum,"chips",e.target.value)} style={SC.inp} placeholder="0"/></div>
+              <div><div style={SC.lbl}>BUNKER</div>
+                <input type="number" min="0" max="10" value={hd.bunker||""} onChange={e=>updHole(selJ,hNum,"bunker",e.target.value)} style={SC.inp} placeholder="0"/></div>
+            </div>
+            {/* Fila 3: 1er putt, dist tiro green, penalidades */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"9px"}}>
+              <div><div style={SC.lbl}>1ER PUTT (yds)</div>
+                <input type="number" min="0" max="100" value={hd.distPutt1||""} onChange={e=>updHole(selJ,hNum,"distPutt1",e.target.value)} style={SC.inp} placeholder="0"/></div>
+              <div><div style={SC.lbl}>DIST. A GREEN</div>
+                <input type="number" min="0" max="500" value={hd.distGreen||""} onChange={e=>updHole(selJ,hNum,"distGreen",e.target.value)} style={SC.inp} placeholder="yds"/></div>
+              <div>
+                <div style={SC.lbl}>PENALIDADES</div>
+                <div style={{display:"flex",flexDirection:"column",gap:"4px",paddingTop:"2px"}}>
+                  {[["ob","OB"],["agua","Agua"],["perdida","Perdida"]].map(([k,label])=>(
+                    <label key={k} style={{display:"flex",alignItems:"center",gap:"6px",cursor:"pointer",fontSize:"13px",color:hd["pen_"+k]?(L?"#c04040":"#e06060"):txtMuted}}>
+                      <input type="checkbox" checked={!!hd["pen_"+k]} onChange={e=>updHole(selJ,hNum,"pen_"+k,e.target.checked)}
+                        style={{width:"16px",height:"16px",cursor:"pointer"}}/>
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         );
       })()}
 
-      {subTab==="notas"&&(()=>{
-        const notaH=j.notas[hNum]||"";
+      {/* ── ANOTACIONES POR HOYO ── */}
+      {subTab==="anotaciones"&&(()=>{
+        const notasH=j.notasHoyo?.[hNum]||{};
         return(
-          <div style={S.card}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
-              <div style={{color:gold,fontSize:"12px",letterSpacing:"2px"}}>NOTA · HOYO {hNum} · {j.nombre}</div>
-              <button onClick={()=>startVoice(selJ,hNum)} disabled={recStatus==="recording"} style={{
-                background:recStatus==="recording"?"#8B1A1A":recStatus==="done"?"#1a4a1a":"#1a1612",
-                border:`1px solid ${recStatus==="recording"?"#c04040":"#5a4a20"}`,
-                color:recStatus==="recording"?"#ff6060":recStatus==="done"?"#6a9a50":"#b09050",
-                borderRadius:"6px",padding:"6px 12px",cursor:"pointer",fontSize:"12px"
-              }}>{recStatus==="recording"?"🔴 Grabando...":recStatus==="done"?"✓ Listo":"🎤 Grabar"}</button>
+          <div>
+            <div style={{color:jCol.text,fontSize:"12px",letterSpacing:"1px",marginBottom:"10px",textTransform:"uppercase"}}>
+              Anotaciones · Hoyo {hNum} · {j.nombre}
             </div>
-            <textarea value={notaH} onChange={e=>updNota(selJ,hNum,e.target.value)}
-              placeholder="Nota para este hoyo..."
-              style={{...S.inp,width:"100%",minHeight:"100px",resize:"vertical"}}/>
+            {ZONES.map((zona,zi)=>{
+              const recKey=`z${zi}_${selJ}_${hNum}`;
+              return(
+                <div key={zona} style={{...SC.card,marginBottom:"8px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                    <div style={{color:jCol.text,fontSize:"12px",fontWeight:"bold"}}>{zona}</div>
+                    {voiceBtn(recStatus,recKey,()=>startVoice(selJ,"zona_"+zi,hNum),L)}
+                  </div>
+                  <textarea value={notasH["zona_"+zi]||""} onChange={e=>updNotaHoyo(selJ,hNum,"zona_"+zi,e.target.value)}
+                    placeholder={`Observación — ${zona}...`}
+                    style={{...SC.inp,minHeight:"60px",resize:"vertical",fontSize:"14px"}}/>
+                </div>
+              );
+            })}
+            {/* Campo libre */}
+            <div style={SC.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                <div style={{color:gold,fontSize:"12px",fontWeight:"bold"}}>Anotación libre</div>
+                {voiceBtn(recStatus,`libre_${selJ}_${hNum}`,()=>startVoice(selJ,"notaLibre",hNum),L)}
+              </div>
+              <textarea value={notasH.notaLibre||""} onChange={e=>updNotaHoyo(selJ,hNum,"notaLibre",e.target.value)}
+                placeholder="Notas libres del coach para este hoyo..."
+                style={{...SC.inp,minHeight:"80px",resize:"vertical",fontSize:"14px"}}/>
+            </div>
           </div>
         );
       })()}
 
-      {/* Nota general del jugador */}
-      <div style={{...S.card,marginTop:"10px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-          <div style={{color:gold,fontSize:"11px",letterSpacing:"2px"}}>NOTA GENERAL · {j.nombre.toUpperCase()}</div>
-          <button onClick={()=>startVoice(selJ,0)} disabled={recStatus==="recording"} style={{
-            background:recStatus==="recording"?"#8B1A1A":"#1a1612",
-            border:"1px solid #5a4a20",color:"#b09050",borderRadius:"6px",padding:"5px 10px",cursor:"pointer",fontSize:"11px"
-          }}>🎤</button>
-        </div>
-        <textarea value={j.notaGeneral||""} onChange={e=>updNota(selJ,0,e.target.value)}
-          placeholder="Resumen del jugador..."
-          style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
-      </div>
+      {/* ── PLAN HOYO 0 ── */}
+      {subTab==="plan"&&(()=>{
+        const plan=j.planJuego||{};
+        return(
+          <div>
+            <div style={{...SC.card,background:L?"#f0ead0":(jCol.bg),border:`1px solid ${jCol.border}`,marginBottom:"12px"}}>
+              <div style={{color:jCol.text,fontSize:"13px",fontWeight:"bold",marginBottom:"4px"}}>Plan de Juego · {j.nombre} {j.apellido}</div>
+              <div style={{color:txtMuted,fontSize:"12px"}}>Completar antes de salir a la cancha. Define el proceso para cada zona mental.</div>
+            </div>
+            {ZONES.map((zona,zi)=>{
+              const recKey=`plan_z${zi}_${selJ}`;
+              return(
+                <div key={zona} style={SC.card}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                    <div style={{color:jCol.text,fontSize:"13px",fontWeight:"bold"}}>{zona}</div>
+                    {voiceBtn(recStatus,recKey,()=>startVoice(selJ,"zona_plan_"+zi,null,"plan"),L)}
+                  </div>
+                  <textarea value={plan["zona_plan_"+zi]||""} onChange={e=>updPlanZona(selJ,"zona_plan_"+zi,e.target.value)}
+                    placeholder={`Plan para ${zona}...`}
+                    style={{...SC.inp,minHeight:"64px",resize:"vertical",fontSize:"14px"}}/>
+                </div>
+              );
+            })}
+            {/* Estrategia global */}
+            <div style={SC.card}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                <div style={{color:gold,fontSize:"13px",fontWeight:"bold"}}>Estrategia Global de Juego</div>
+                {voiceBtn(recStatus,`plan_eg_${selJ}`,()=>startVoice(selJ,"estrategiaGlobal",null,"plan"),L)}
+              </div>
+              <textarea value={plan.estrategiaGlobal||""} onChange={e=>updPlanZona(selJ,"estrategiaGlobal",e.target.value)}
+                placeholder="Estrategia general para la vuelta de hoy..."
+                style={{...SC.inp,minHeight:"80px",resize:"vertical",fontSize:"14px"}}/>
+            </div>
+          </div>
+        );
+      })()}
 
-      {/* Resumen coach — por jugador */}
-      <div style={{...S.card,marginTop:"10px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-          <div style={{color:gold,fontSize:"11px",letterSpacing:"2px"}}>RESUMEN COACH · {j.nombre.toUpperCase()}</div>
-          <button onClick={()=>startVoice(selJ,-1)} disabled={recStatus==="recording"} style={{
-            background:recStatus==="recording"?"#8B1A1A":"#1a1612",
-            border:"1px solid #5a4a20",color:"#b09050",borderRadius:"6px",padding:"5px 10px",cursor:"pointer",fontSize:"11px"
-          }}>{recStatus==="recording"?"🔴":"🎤"}</button>
-        </div>
-        <textarea value={j.resumenCoach||""} onChange={e=>updClase(c=>{c.jugadores[selJ].resumenCoach=e.target.value;})}
-          placeholder="Observaciones del coach para este jugador..."
-          style={{...S.inp,width:"100%",minHeight:"72px",resize:"vertical"}}/>
-      </div>
+      {/* ── RESUMEN DEL JUGADOR ── */}
+      {subTab==="resumen"&&(
+        <>
+          <div style={{...SC.card,marginBottom:"10px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+              <div style={{color:gold,fontSize:"12px",letterSpacing:"1px",textTransform:"uppercase"}}>Nota General · {j.nombre}</div>
+              {voiceBtn(recStatus,`ng_${selJ}`,()=>startVoice(selJ,"notaGeneral"),L)}
+            </div>
+            <textarea value={j.notaGeneral||""} onChange={e=>updClase(c=>{c.jugadores[selJ].notaGeneral=e.target.value;})}
+              placeholder="Observaciones generales del jugador..."
+              style={{...SC.inp,minHeight:"72px",resize:"vertical",fontSize:"14px"}}/>
+          </div>
+          <div style={{...SC.card,background:L?"#e8f0e0":(jCol.bg),border:`1px solid ${jCol.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+              <div style={{color:jCol.text,fontSize:"12px",letterSpacing:"1px",textTransform:"uppercase"}}>Resumen Coach · {j.nombre}</div>
+              {voiceBtn(recStatus,`rc_${selJ}`,()=>startVoice(selJ,"resumenCoach"),L)}
+            </div>
+            <textarea value={j.resumenCoach||""} onChange={e=>updClase(c=>{c.jugadores[selJ].resumenCoach=e.target.value;})}
+              placeholder="Resumen del coach para este jugador..."
+              style={{...SC.inp,minHeight:"80px",resize:"vertical",fontSize:"14px",
+                background:L?"#f0f5e8":"#182010",border:`2px solid ${jCol.border}`}}/>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 // ─── REPORTE CLASE ────────────────────────────────────────────────────────────
-function ReporteClase({clase,onBack,onUpdate}){
+function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
   const [selJ,setSelJ]=useState(0);
   const [recStatus,setRecStatus]=useState("idle");
+  const [verPlan,setVerPlan]=useState(false);
+
+  const L=lightMode||false;
+  const bg=L?"#f5f0e8":"#0f0d0a";
+  const cardBg=L?"#fff":"#1c1810";
+  const cardBorder=L?"#d8cbb0":"#5a4a20";
+  const txt=L?"#2a1a08":"#f5ead0";
+  const txtMuted=L?"#7a5a20":"#b09050";
+  const inpBg=L?"#f0e8d8":"#2a2318";
+  const inpBorder=L?"#c0a060":"#7a6030";
+  const SC={
+    page:{minHeight:"100vh",background:bg,color:txt,padding:"18px 14px",maxWidth:"860px",margin:"0 auto"},
+    card:{background:cardBg,border:`1px solid ${cardBorder}`,borderRadius:"6px",padding:"16px",marginBottom:"12px"},
+    inp:{background:inpBg,border:`2px solid ${inpBorder}`,borderRadius:"4px",color:txt,padding:"10px 11px",fontSize:"15px",width:"100%",boxSizing:"border-box",outline:"none"},
+    lbl:{fontSize:"12px",color:txtMuted,letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"5px"},
+  };
 
   function calcTotal(jIdx){
     return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0)||0;
@@ -2053,32 +2219,31 @@ function ReporteClase({clase,onBack,onUpdate}){
   function calcPutts(jIdx){
     return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(parseInt(h.putts)||0),0)||0;
   }
+  function calcPenalidades(jIdx){
+    return Object.values(clase.jugadores[jIdx].holes).reduce((s,h)=>s+(h.pen_ob?1:0)+(h.pen_agua?1:0)+(h.pen_perdida?1:0),0)||0;
+  }
   function calcNeto(jIdx){
     const total=calcTotal(jIdx);
     if(!total)return null;
     const hcpProp=Math.ceil((clase.jugadores[jIdx].hcp||0)*clase.numHoles/18);
     return total-hcpProp;
   }
-
   function updJugador(jIdx,fn){
     if(!onUpdate)return;
     const next=JSON.parse(JSON.stringify(clase));
     fn(next.jugadores[jIdx]);
     onUpdate(next);
   }
-
-  function startVoiceReporte(jIdx,campo){
-    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
-      alert("⚠️ Reconocimiento de voz no disponible.");return;
-    }
+  function startVoiceR(jIdx,campo){
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert("⚠️ Reconocimiento de voz no disponible.");return;}
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec=new SR();
     rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
-    setRecStatus(campo);
+    setRecStatus(campo+"_"+jIdx);
     rec.onresult=e=>{
-      const txt=e.results[0][0].transcript;
-      updJugador(jIdx,j=>{j[campo]=(j[campo]||"")+(txt?" "+txt:"");});
-      setRecStatus("idle");
+      const txt2=e.results[0][0].transcript;
+      updJugador(jIdx,j=>{j[campo]=(j[campo]||"")+(txt2?" "+txt2:"");});
+      setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
     };
     rec.onerror=()=>setRecStatus("idle");
     rec.start();
@@ -2088,12 +2253,17 @@ function ReporteClase({clase,onBack,onUpdate}){
     const j=clase.jugadores[jIdx];
     const total=calcTotal(jIdx);
     const putts=calcPutts(jIdx);
+    const pen=calcPenalidades(jIdx);
     const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
     const neto=total?total-hcpProp:null;
+    const plan=j.planJuego||{};
 
     const hoyoRows=Array.from({length:clase.numHoles},(_,i)=>{
       const h=j.holes[i+1]||{};
-      const nota=j.notas[i+1]||"";
+      const nh=j.notasHoyo?.[i+1]||{};
+      const penH=(h.pen_ob?1:0)+(h.pen_agua?1:0)+(h.pen_perdida?1:0);
+      const notaLibre=nh.notaLibre||"";
+      const penStr=[h.pen_ob?"OB":"",h.pen_agua?"Agua":"",h.pen_perdida?"Perd.":""].filter(Boolean).join(", ");
       return `<tr>
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${i+1}</td>
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.par||"—"}</td>
@@ -2101,14 +2271,23 @@ function ReporteClase({clase,onBack,onUpdate}){
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.putts||"—"}</td>
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.chips||"—"}</td>
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.bunker||"—"}</td>
-        ${nota?`<td style="border:1px solid #ddd;padding:6px;font-size:11px;color:#555">${nota}</td>`:`<td style="border:1px solid #ddd;padding:6px;color:#ccc">—</td>`}
+        <td style="border:1px solid #ddd;padding:6px;text-align:center;color:${penH>0?"#c04040":"#999"}">${penStr||"—"}</td>
+        <td style="border:1px solid #ddd;padding:6px;font-size:11px;color:#555">${notaLibre||"—"}</td>
       </tr>`;
     }).join("");
 
-    const notasHoyosConNota=Array.from({length:clase.numHoles},(_,i)=>{
-      const n=j.notas[i+1];
-      return n?`<div style="margin-bottom:12px"><strong style="color:#6a4a1a">Hoyo ${i+1}:</strong> ${n}</div>`:"";
+    // Anotaciones por hoyo y zona
+    const anotacionesHoyo=Array.from({length:clase.numHoles},(_,i)=>{
+      const nh=j.notasHoyo?.[i+1]||{};
+      const zonaTextos=ZONES.map((z,zi)=>nh["zona_"+zi]?`<div style="margin-bottom:4px"><strong style="color:#7a5010">${z}:</strong> ${nh["zona_"+zi]}</div>`:"").join("");
+      const libre=nh.notaLibre?`<div style="margin-bottom:4px"><strong style="color:#5a4a10">Libre:</strong> ${nh.notaLibre}</div>`:"";
+      const hay=zonaTextos+libre;
+      return hay?`<div style="margin-bottom:14px"><div style="font-weight:bold;color:#6a4a1a;font-size:13px;margin-bottom:6px">Hoyo ${i+1}</div>${hay}</div>`:"";
     }).join("");
+
+    // Plan de juego
+    const planHTML=ZONES.map((z,zi)=>plan["zona_plan_"+zi]?`<div style="margin-bottom:10px"><strong style="color:#7a5010">${z}:</strong><div style="padding:8px 12px;background:#f9f6f0;border-left:3px solid #C9A84C;margin-top:4px;font-size:12px">${plan["zona_plan_"+zi]}</div></div>`:"").join("")
+      +(plan.estrategiaGlobal?`<div style="margin-bottom:10px"><strong style="color:#6a4a1a">Estrategia Global:</strong><div style="padding:8px 12px;background:#f9f6f0;border-left:3px solid #C9A84C;margin-top:4px;font-size:12px">${plan.estrategiaGlobal}</div></div>`:"");
 
     const html=`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
 <title>Informe Filo Golf · ${j.nombre} ${j.apellido}</title>
@@ -2125,8 +2304,10 @@ h3{color:#6a4a1a;font-size:13px;margin:16px 0 8px;letter-spacing:1px;text-transf
 .card{background:#f9f6f0;border:1px solid #e8dcc8;border-radius:6px;padding:14px;margin-bottom:16px}
 table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
 th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:11px;letter-spacing:1px}
-.nota-texto{font-size:12px;color:#333;line-height:1.6;background:#f9f6f0;padding:12px;border-radius:4px;border-left:3px solid #C9A84C}
+.nota-texto{font-size:12px;color:#333;line-height:1.6;background:#f9f6f0;padding:12px;border-radius:4px;border-left:3px solid #C9A84C;margin-bottom:10px}
 .nota-coach{font-size:12px;color:#333;line-height:1.6;background:#f0f6e8;padding:12px;border-radius:4px;border-left:3px solid #6a9a30}
+.jugador-box{border:2px dashed #e8dcc8;border-radius:6px;padding:14px;margin-bottom:16px;background:#fffdf8}
+.jugador-box h4{color:#6a4a1a;font-size:14px;margin-bottom:8px}
 </style></head>
 <body>
 <div class="header">
@@ -2142,15 +2323,21 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${total||"—"}</div></div>
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Neto (HCP ${hcpProp})</div><div style="font-size:26px;font-weight:bold;color:#6a4a1a">${neto??("—")}</div></div>
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Putts</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${putts||"—"}</div></div>
-    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Hoyos</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${clase.numHoles}</div></div>
+    <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Penalidades</div><div style="font-size:26px;font-weight:bold;color:${pen>0?"#c04040":"#1a1612"}">${pen||"0"}</div></div>
   </div>
+  ${planHTML?`<h3>Plan de Juego (Hoyo 0)</h3><div class="card">${planHTML}</div>`:""}
   <h3>Tarjeta de Puntaje</h3>
   <table><thead><tr>
-    <th>Hoyo</th><th>Par</th><th>Golpes</th><th>Putts</th><th>Chips</th><th>Bunker</th><th>Nota Coach</th>
+    <th>Hoyo</th><th>Par</th><th>Golpes</th><th>Putts</th><th>Chips</th><th>Bunker</th><th>Penal.</th><th>Anotación</th>
   </tr></thead><tbody>${hoyoRows}</tbody></table>
-  ${notasHoyosConNota?`<h3>Notas del Coach por Hoyo</h3><div class="nota-texto">${notasHoyosConNota}</div>`:""}
+  ${anotacionesHoyo?`<h3>Anotaciones por Hoyo</h3><div class="nota-texto">${anotacionesHoyo}</div>`:""}
   ${j.notaGeneral?`<h3>Observaciones del Jugador</h3><div class="nota-texto">${j.notaGeneral}</div>`:""}
   ${j.resumenCoach?`<h3>Resumen del Coach</h3><div class="nota-coach">${j.resumenCoach}</div>`:""}
+  <div class="jugador-box">
+    <h4>Espacio para el Jugador</h4>
+    <p style="font-size:12px;color:#888;margin-bottom:8px">¿Algo que el coach no haya visto? Podés agregar tus propias observaciones aquí.</p>
+    <div style="height:80px;border:1px solid #e8dcc8;border-radius:4px"></div>
+  </div>
 </div>
 <div class="footer"><span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span></div>
 </body></html>`;
@@ -2166,77 +2353,110 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
   const j=clase.jugadores[selJ];
   const total=calcTotal(selJ);
   const putts=calcPutts(selJ);
+  const pen=calcPenalidades(selJ);
   const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
+  const jCol=L?J_COLORS_LIGHT[selJ%4]:J_COLORS[selJ%4];
 
   return(
-    <div style={S.page}>
-      <button style={{...S.btn("g"),marginBottom:"14px"}} onClick={onBack}>← Volver</button>
-      <div style={S.h2}>Clase: {clase.fecha} · {clase.courseName}</div>
-      <div style={{color:"#b09050",fontSize:"11px",marginBottom:"14px"}}>{clase.jugadores.length} jugador{clase.jugadores.length!==1?"es":""}</div>
+    <div style={SC.page}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",flexWrap:"wrap",gap:"6px"}}>
+        <button style={{background:L?"#e0d8c8":"#2d2720",color:L?"#5a3a10":"#f5ead0",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"6px 12px",fontSize:"12px",cursor:"pointer"}} onClick={onBack}>← Volver</button>
+        {setLightMode&&<button style={{background:L?"#e0d8c8":"#2d2720",color:L?"#5a3a10":"#f5ead0",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"6px 10px",fontSize:"11px",cursor:"pointer"}}
+          onClick={()=>setLightMode(!L)}>{L?"🌙 Oscuro":"☀️ Claro"}</button>}
+      </div>
+      <div style={{fontSize:"15px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"4px",borderBottom:`1px solid ${cardBorder}`,paddingBottom:"7px"}}>
+        Clase: {clase.fecha} · {clase.courseName}
+      </div>
+      <div style={{color:txtMuted,fontSize:"12px",marginBottom:"14px"}}>{clase.jugadores.length} jugador{clase.jugadores.length!==1?"es":""}</div>
 
       {/* Selector jugador */}
       <div style={{display:"flex",gap:"5px",marginBottom:"14px",flexWrap:"wrap"}}>
-        {clase.jugadores.map((jj,i)=>(
-          <button key={i} style={{...S.nb(selJ===i),flex:1}} onClick={()=>setSelJ(i)}>
-            {jj.nombre} {jj.apellido}
-          </button>
-        ))}
+        {clase.jugadores.map((jj,i)=>{
+          const jc=L?J_COLORS_LIGHT[i%4]:J_COLORS[i%4];
+          const act=selJ===i;
+          return(
+            <button key={i} onClick={()=>setSelJ(i)} style={{
+              flex:1,padding:"7px 5px",fontSize:"13px",fontWeight:act?"bold":"normal",
+              background:act?jc.bg:(L?"#f0e8d8":"#1a1612"),
+              color:act?jc.text:txtMuted,
+              border:`2px solid ${act?jc.border:cardBorder}`,
+              borderRadius:"6px",cursor:"pointer"
+            }}>
+              <span style={{display:"inline-block",width:"8px",height:"8px",borderRadius:"50%",background:act?jc.dot:"transparent",marginRight:"5px"}}></span>
+              {jj.nombre} {jj.apellido}
+            </button>
+          );
+        })}
       </div>
 
-      <div style={S.card}>
-        <div style={{color:gold,fontSize:"13px",fontWeight:"bold",marginBottom:"4px"}}>{j.nombre} {j.apellido}</div>
-        <div style={{color:"#b09050",fontSize:"10px",marginBottom:"12px"}}>
+      <div style={SC.card}>
+        <div style={{color:jCol.text,fontSize:"14px",fontWeight:"bold",marginBottom:"4px"}}>{j.nombre} {j.apellido}</div>
+        <div style={{color:txtMuted,fontSize:"12px",marginBottom:"12px"}}>
           HCP {j.hcp}{clase.numHoles!==18?` → ${hcpProp} para ${clase.numHoles} hoyos`:""}
         </div>
 
         {/* Números */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"14px",textAlign:"center"}}>
-          <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
-            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Total</div>
-            <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{total||"—"}</div>
-          </div>
-          <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
-            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Putts</div>
-            <div style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold"}}>{putts||"—"}</div>
-          </div>
-          <div style={{background:"#0f0d0a",borderRadius:"6px",padding:"10px"}}>
-            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Neto</div>
-            <div style={{color:"#f5ead0",fontSize:"22px",fontWeight:"bold"}}>{calcNeto(selJ)??("—")}</div>
-          </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"8px",marginBottom:"14px",textAlign:"center"}}>
+          {[["Total",total||"—",gold],["Putts",putts||"—",txt],["Neto",calcNeto(selJ)??("—"),txt],["Penal.",pen||"0",pen>0?"#e06060":txt]].map(([lbl,val,col])=>(
+            <div key={lbl} style={{background:L?"#f0e8d8":"#0f0d0a",borderRadius:"6px",padding:"9px 4px"}}>
+              <div style={{color:txtMuted,fontSize:"10px",textTransform:"uppercase",letterSpacing:"1px"}}>{lbl}</div>
+              <div style={{color:col,fontSize:"22px",fontWeight:"bold"}}>{val}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Nota general — editable + audio */}
+        {/* Plan de juego (toggle) */}
+        {(j.planJuego&&Object.values(j.planJuego).some(Boolean))&&(
+          <div style={{marginBottom:"12px"}}>
+            <button onClick={()=>setVerPlan(!verPlan)} style={{
+              background:L?"#e8e0d0":"#2a2318",color:jCol.text,border:`1px solid ${jCol.border}`,
+              borderRadius:"4px",padding:"6px 12px",fontSize:"12px",cursor:"pointer",width:"100%",textAlign:"left"
+            }}>{verPlan?"▲":"▶"} Plan de Juego · Hoyo 0</button>
+            {verPlan&&(
+              <div style={{marginTop:"8px"}}>
+                {ZONES.map((zona,zi)=>j.planJuego["zona_plan_"+zi]&&(
+                  <div key={zona} style={{marginBottom:"8px"}}>
+                    <div style={{color:jCol.text,fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"3px"}}>{zona}</div>
+                    <div style={{background:L?"#f0e8d8":"#141210",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"8px",fontSize:"13px",color:txt}}>{j.planJuego["zona_plan_"+zi]}</div>
+                  </div>
+                ))}
+                {j.planJuego.estrategiaGlobal&&(
+                  <div style={{marginBottom:"8px"}}>
+                    <div style={{color:gold,fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"3px"}}>Estrategia Global</div>
+                    <div style={{background:L?"#f0e8d8":"#141210",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"8px",fontSize:"13px",color:txt}}>{j.planJuego.estrategiaGlobal}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Nota general */}
         <div style={{marginBottom:"10px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
-            <div style={{color:"#b09050",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Nota general del jugador</div>
-            {onUpdate&&<button onClick={()=>startVoiceReporte(selJ,"notaGeneral")} disabled={recStatus!=="idle"} style={{
-              background:recStatus==="notaGeneral"?"#8B1A1A":"#1a1612",
-              border:"1px solid #5a4a20",color:"#b09050",borderRadius:"6px",padding:"4px 9px",cursor:"pointer",fontSize:"11px"
-            }}>{recStatus==="notaGeneral"?"🔴":"🎤"}</button>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
+            <div style={SC.lbl}>Nota general del jugador</div>
+            {onUpdate&&voiceBtn(recStatus,`ng_${selJ}`,()=>startVoiceR(selJ,"notaGeneral"),L)}
           </div>
           <textarea value={j.notaGeneral||""} onChange={e=>updJugador(selJ,jj=>{jj.notaGeneral=e.target.value;})}
             placeholder="Observaciones del jugador..."
-            style={{...S.inp,width:"100%",minHeight:"64px",resize:"vertical",fontSize:"12px"}}
+            style={{...SC.inp,minHeight:"64px",resize:"vertical",fontSize:"14px"}}
             readOnly={!onUpdate}/>
         </div>
 
-        {/* Resumen coach — editable + audio */}
+        {/* Resumen coach */}
         <div style={{marginBottom:"14px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
-            <div style={{color:"#8aba50",fontSize:"9px",textTransform:"uppercase",letterSpacing:"1px"}}>Resumen Coach</div>
-            {onUpdate&&<button onClick={()=>startVoiceReporte(selJ,"resumenCoach")} disabled={recStatus!=="idle"} style={{
-              background:recStatus==="resumenCoach"?"#8B1A1A":"#1a1612",
-              border:"1px solid #3a5020",color:"#8aba50",borderRadius:"6px",padding:"4px 9px",cursor:"pointer",fontSize:"11px"
-            }}>{recStatus==="resumenCoach"?"🔴":"🎤"}</button>}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
+            <div style={{...SC.lbl,color:jCol.text}}>Resumen Coach</div>
+            {onUpdate&&voiceBtn(recStatus,`rc_${selJ}`,()=>startVoiceR(selJ,"resumenCoach"),L)}
           </div>
           <textarea value={j.resumenCoach||""} onChange={e=>updJugador(selJ,jj=>{jj.resumenCoach=e.target.value;})}
             placeholder="Resumen del coach para este jugador..."
-            style={{...S.inp,width:"100%",minHeight:"64px",resize:"vertical",fontSize:"12px",
-              background:"#182010",border:"2px solid #3a5020"}}
+            style={{...SC.inp,minHeight:"72px",resize:"vertical",fontSize:"14px",
+              background:L?"#e8f0e0":"#182010",border:`2px solid ${jCol.border}`}}
             readOnly={!onUpdate}/>
         </div>
 
-        <button style={{...S.btn("p"),width:"100%"}} onClick={()=>generarPDF(selJ)}>
+        <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",width:"100%"}} onClick={()=>generarPDF(selJ)}>
           ↓ Descargar Informe del Jugador
         </button>
       </div>
@@ -2262,6 +2482,9 @@ function ClaseEnCancha(){
   const [selH,setSelH]=useState(1);
   const [subTab,setSubTab]=useState("tarjeta");
   const [recStatus,setRecStatus]=useState("idle");
+  const [lightMode,setLightMode]=useState(()=>lsGet("coach:lightMode")||false);
+
+  function toggleLight(v){setLightMode(v);lsSet("coach:lightMode",v);}
 
   function saveClases(arr){setClases(arr);lsSet(CLASE_LS,arr);}
 
@@ -2292,7 +2515,7 @@ function ClaseEnCancha(){
       const nuevaClase={
         id:"clase_"+Date.now(),
         fecha,courseId:cancha,courseName:course.name,numHoles,
-        jugadores:js.map(j=>({nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,holes:{},notas:{},notaGeneral:"",resumenCoach:""})),
+        jugadores:js.map(j=>({nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,holes:{},notas:{},notaGeneral:"",resumenCoach:"",planJuego:{},notasHoyo:{}})),
         finalizada:false,createdAt:Date.now()
       };
       setCurPersist(nuevaClase);setSelJ(0);setSelH(1);setSubTab("tarjeta");setPhase("active");
@@ -2364,6 +2587,7 @@ function ClaseEnCancha(){
     onUpdate={next=>{setCurPersist(next);setCur(next);}}
     onFinalizar={next=>{setCurPersist(next);setCur(next);setPhase("report");}}
     onGuardar={(next,arr)=>{setCurPersist(next);setCur(next);saveClases(arr);}}
+    lightMode={lightMode} setLightMode={toggleLight}
   />;
   if(phase==="report"){
     function guardarYSalir(){
@@ -2375,12 +2599,12 @@ function ClaseEnCancha(){
     return <ReporteClase clase={cur} onBack={guardarYSalir} onUpdate={next=>{
       const arr=[...clases.filter(c=>c.id!==next.id),next];
       saveClases(arr);setCurPersist(next);setCur(next);
-    }}/>;
+    }} lightMode={lightMode} setLightMode={toggleLight}/>;
   }
   if(selClase)return <ReporteClase clase={selClase} onBack={()=>setSelClase(null)} onUpdate={next=>{
     const arr=[...clases.filter(c=>c.id!==next.id),next];
     saveClases(arr);setSelClase(next);
-  }}/>;
+  }} lightMode={lightMode} setLightMode={toggleLight}/>;
 
   // Historial alfabético
   const byAlumno={};
