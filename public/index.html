@@ -2087,22 +2087,49 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
                 </div>
               </div>
             </div>
-            {/* Fila 4: segundo tiro a green (condicional) */}
-            <div style={{borderTop:`1px solid ${L?"#ddd":"#3a3020"}`,paddingTop:"8px"}}>
-              <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"6px"}}>
-                <label style={{display:"flex",alignItems:"center",gap:"6px",cursor:"pointer",fontSize:"13px",color:txtMuted}}>
-                  <input type="checkbox" checked={!!hd.tiro2Green} onChange={e=>updHole(selJ,hNum,"tiro2Green",e.target.checked)}
-                    style={{width:"15px",height:"15px",cursor:"pointer"}}/>
-                  <span style={{color:hd.tiro2Green?(L?"#5a3a10":gold):txtMuted,fontSize:"12px",letterSpacing:"0.5px"}}>
-                    2° TIRO A GREEN
-                  </span>
-                </label>
-              </div>
-              {hd.tiro2Green&&(
-                <input type="number" min="0" max="500" value={hd.distGreen2||""} onChange={e=>updHole(selJ,hNum,"distGreen2",e.target.value)}
-                  style={{...SC.inp,width:"50%"}} placeholder="dist. yds"/>
-              )}
-            </div>
+            {/* Fila 4: tiros a green (dinámico, hasta 7) */}
+            {(()=>{
+              const tirosG=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];
+              const lastTiro=tirosG[tirosG.length-1];
+              const greenCerrado=lastTiro&&(lastTiro.resultado==="green"||lastTiro.resultado==="chip"||lastTiro.resultado==="bunker");
+              function updTiro(i,k,v){const arr=tirosG.map((t,idx)=>idx===i?{...t,[k]:v}:t);updHole(selJ,hNum,"tirosGreen",arr);}
+              function addTiroG(){if(tirosG.length<7)updHole(selJ,hNum,"tirosGreen",[...tirosG,{dist:"",resultado:""}]);}
+              function remTiroG(i){updHole(selJ,hNum,"tirosGreen",tirosG.filter((_,idx)=>idx!==i));}
+              return(
+                <div style={{borderTop:`1px solid ${L?"#ddd":"#3a3020"}`,paddingTop:"10px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                    <span style={{fontSize:"11px",color:(L?"#5a3a10":gold),letterSpacing:"1px",textTransform:"uppercase",fontWeight:"bold"}}>Tiros a Green</span>
+                    {!greenCerrado&&tirosG.length<7&&(
+                      <button onClick={addTiroG} style={{...SC.btn("g"),padding:"4px 12px",fontSize:"12px"}}>+ Tiro</button>
+                    )}
+                  </div>
+                  {tirosG.length===0&&(
+                    <button onClick={addTiroG} style={{...SC.btn("g"),width:"100%",padding:"8px",fontSize:"12px",marginBottom:"4px"}}>+ Agregar tiro a green</button>
+                  )}
+                  {tirosG.map((t,i)=>(
+                    <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"6px",alignItems:"end",marginBottom:"7px"}}>
+                      <div>
+                        <div style={SC.lbl}>{i===0?"1° TIRO":`${i+1}° TIRO`} (yds)</div>
+                        <input type="number" min="0" max="600" value={t.dist||""} onChange={e=>updTiro(i,"dist",e.target.value)} style={SC.inp} placeholder="dist."/>
+                      </div>
+                      <div>
+                        <div style={SC.lbl}>RESULTADO</div>
+                        <select value={t.resultado||""} onChange={e=>updTiro(i,"resultado",e.target.value)} style={SC.inp}>
+                          <option value="">—</option>
+                          <option value="green">🟢 Green</option>
+                          <option value="chip">🟡 Zona chip</option>
+                          <option value="bunker">🟤 Bunker</option>
+                          <option value="corto">❌ Corto</option>
+                          <option value="largo">❌ Largo</option>
+                          <option value="lateral">❌ Lateral</option>
+                        </select>
+                      </div>
+                      <button onClick={()=>remTiroG(i)} style={{...SC.btn("d"),padding:"9px 10px",fontSize:"14px",lineHeight:1}}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
@@ -2289,7 +2316,7 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.chips||"—"}</td>
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.bunker||"—"}</td>
         <td style="border:1px solid #ddd;padding:6px;text-align:center;color:${penH>0?"#c04040":"#999"}">${penStr||"—"}</td>
-        <td style="border:1px solid #ddd;padding:6px;text-align:center;font-size:11px">${h.distGreen||"—"}${h.tiro2Green&&h.distGreen2?` / ${h.distGreen2}`:""}</td>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center;font-size:11px">${Array.isArray(h.tirosGreen)&&h.tirosGreen.length?h.tirosGreen.map((t,ti)=>`${ti+1}°: ${t.dist||"—"}y${t.resultado?` (${t.resultado})`:""}`.trim()).join(" | "):(h.distGreen||"—")}</td>
         <td style="border:1px solid #ddd;padding:6px;font-size:11px;color:#555">${notaLibre||"—"}</td>
       </tr>`;
     }).join("");
@@ -2603,42 +2630,58 @@ function ClaseEnCancha(){
   // ── Setup nueva clase ──────────────────────────────────────────────────────
   function SetupClase(){
     const [fecha,setFecha]=useState(new Date().toISOString().slice(0,10));
-    const [canchaId,setCanchaId]=useState("lomas");
-    const [configKey,setConfigKey]=useState("lomas|Lomas Azul");
-    const [jugadores,setJugadores]=useState([{nombre:"",apellido:"",hcp:"18"}]);
+    const [numHoles,setNumHoles]=useState(9);
+    // jugador: {nombre, apellido, hcp, canchaId, configKey}
+    const defaultCancha="lomas";
+    const defaultCfg="lomas|Lomas Azul";
+    const [jugadores,setJugadores]=useState([{nombre:"",apellido:"",hcp:"18",canchaId:defaultCancha,configKey:defaultCfg}]);
     const [err,setErr]=useState("");
 
-    // Configs disponibles para la cancha seleccionada
-    const configsParaCancha=Object.keys(PRESET_CONFIGS).filter(k=>k.startsWith(canchaId+"|"));
-
-    function onCanchaChange(cid){
-      setCanchaId(cid);
-      const cfgs=Object.keys(PRESET_CONFIGS).filter(k=>k.startsWith(cid+"|"));
-      setConfigKey(cfgs.length?cfgs[0]:"");
+    function addJugador(){
+      if(jugadores.length<4){
+        // copiar cancha/config del último jugador como default
+        const last=jugadores[jugadores.length-1];
+        setJugadores([...jugadores,{nombre:"",apellido:"",hcp:"18",canchaId:last.canchaId,configKey:last.configKey}]);
+      }
     }
-
-    function addJugador(){if(jugadores.length<4)setJugadores([...jugadores,{nombre:"",apellido:"",hcp:"18"}]);}
-    function remJugador(i){if(jugadores.length>1)setJugadores(jugadores.filter((_,j)=>j!==i));}
+    function remJugador(i){if(jugadores.length>1)setJugadores(jugadores.filter((_,x)=>x!==i));}
     function updJ(i,k,v){const a=[...jugadores];a[i]={...a[i],[k]:v};setJugadores(a);}
+    function onJCanchaChange(i,cid){
+      const cfgs=Object.keys(PRESET_CONFIGS).filter(k=>k.startsWith(cid+"|"));
+      updJ(i,"canchaId",cid);
+      const a=[...jugadores];a[i]={...a[i],canchaId:cid,configKey:cfgs.length?cfgs[0]:""};setJugadores(a);
+    }
 
     function iniciar(){
       const js=jugadores.filter(j=>j.nombre.trim()||j.apellido.trim());
       if(!js.length){setErr("Agregá al menos un jugador");return;}
       for(const j of js){if(!j.nombre.trim()||!j.apellido.trim()){setErr("Completá nombre y apellido de cada jugador");return;}}
-      const course=COURSES.find(c=>c.id===canchaId)||COURSES[0];
-      // Si hay config pregrabada, usarla para hoyos/par/dist/hcpIdx
-      const cfg=configKey?PRESET_CONFIGS[configKey]:null;
-      const holeCount=cfg?Object.keys(cfg.holes).length:9;
-      // Pre-cargar datos de hoyo si hay config
-      const holesBase={};
-      if(cfg){Object.entries(cfg.holes).forEach(([h,v])=>{holesBase[parseInt(h)]={par:v.par,dist:v.dist,hcpIdx:v.hcpIdx};});}
+      // Nombre del curso para la clase: usar el del primer jugador
+      const course0=COURSES.find(c=>c.id===js[0].canchaId)||COURSES[0];
       const nuevaClase={
         id:"clase_"+Date.now(),
-        fecha,courseId:canchaId,courseName:course.name,
-        configName:cfg?cfg.name:"",numHoles:holeCount,
-        jugadores:js.map(j=>({nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,
-          holes:cfg?JSON.parse(JSON.stringify(holesBase)):{},
-          notas:{},notaGeneral:"",resumenCoach:"",planJuego:{},notasHoyo:{}})),
+        fecha,
+        courseId:js[0].canchaId,courseName:course0.name,
+        configName:"",numHoles,
+        jugadores:js.map(j=>{
+          const course=COURSES.find(c=>c.id===j.canchaId)||COURSES[0];
+          const cfg=j.configKey?PRESET_CONFIGS[j.configKey]:null;
+          // Pre-cargar hoyos del rango seleccionado (numHoles primeros)
+          const holesBase={};
+          if(cfg){
+            Object.entries(cfg.holes).forEach(([h,v])=>{
+              const hNum=parseInt(h);
+              if(hNum<=numHoles)holesBase[hNum]={par:v.par,dist:v.dist,hcpIdx:v.hcpIdx};
+            });
+          }
+          return{
+            nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,
+            canchaId:j.canchaId,courseName:course.name,
+            configKey:j.configKey,configName:cfg?cfg.name:"",
+            holes:JSON.parse(JSON.stringify(holesBase)),
+            notas:{},notaGeneral:"",resumenCoach:"",planJuego:{},notasHoyo:{}
+          };
+        }),
         finalizada:false,createdAt:Date.now()
       };
       setCurPersist(nuevaClase);setSelJ(0);setSelH(1);setSubTab("tarjeta");setPhase("active");
@@ -2649,59 +2692,58 @@ function ClaseEnCancha(){
         <button style={{...S.btn("g"),marginBottom:"14px"}} onClick={()=>setPhase("list")}>← Volver</button>
         <div style={S.h2}>Nueva Clase en Cancha</div>
         <div style={S.card}>
-          <div style={{marginBottom:"12px"}}>
-            <div style={{color:"#b09050",fontSize:"10px",marginBottom:"4px"}}>FECHA</div>
-            <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={{...S.inp,width:"100%"}}/>
-          </div>
-          <div style={{marginBottom:"10px"}}>
-            <div style={{color:"#b09050",fontSize:"10px",marginBottom:"4px"}}>CANCHA</div>
-            <select value={canchaId} onChange={e=>onCanchaChange(e.target.value)} style={{...S.inp,width:"100%"}}>
-              {COURSES.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          {configsParaCancha.length>0&&(
-            <div style={{marginBottom:"14px"}}>
-              <div style={{color:"#b09050",fontSize:"10px",marginBottom:"4px"}}>CONFIGURACIÓN DE CANCHA</div>
-              <select value={configKey} onChange={e=>setConfigKey(e.target.value)} style={{...S.inp,width:"100%"}}>
-                <option value="">Sin configuración (manual)</option>
-                {configsParaCancha.map(k=><option key={k} value={k}>{PRESET_CONFIGS[k].name}</option>)}
-              </select>
-              {configKey&&(
-                <div style={{color:"#8a9a70",fontSize:"11px",marginTop:"4px"}}>
-                  ✓ {Object.keys(PRESET_CONFIGS[configKey].holes).length} hoyos precargados (par, dist., índice)
-                </div>
-              )}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"14px"}}>
+            <div>
+              <div style={{color:"#b09050",fontSize:"10px",marginBottom:"4px"}}>FECHA</div>
+              <input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} style={{...S.inp,width:"100%"}}/>
             </div>
-          )}
-          {!configsParaCancha.length&&(
-            <div style={{marginBottom:"14px"}}>
-              <div style={{color:"#b09050",fontSize:"10px",marginBottom:"4px"}}>CANTIDAD DE HOYOS</div>
-              <select onChange={e=>{}} style={{...S.inp,width:"100%"}}>
-                {[9,18,6,3].map(n=><option key={n} value={n}>{n} hoyos</option>)}
+            <div>
+              <div style={{color:"#b09050",fontSize:"10px",marginBottom:"4px"}}>HOYOS A JUGAR</div>
+              <select value={numHoles} onChange={e=>setNumHoles(parseInt(e.target.value))} style={{...S.inp,width:"100%"}}>
+                {[3,6,9,12,18].map(n=><option key={n} value={n}>{n} hoyos</option>)}
               </select>
             </div>
-          )}
+          </div>
           <div style={{borderTop:"1px solid #5a4a20",paddingTop:"14px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
               <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase"}}>Jugadores ({jugadores.length}/4)</div>
               {jugadores.length<4&&<button style={{...S.btn("g"),fontSize:"10px",padding:"4px 10px"}} onClick={addJugador}>+ Agregar</button>}
             </div>
-            {jugadores.map((j,i)=>(
-              <div key={i} style={{background:"#141210",borderRadius:"6px",padding:"10px",marginBottom:"8px",border:"1px solid #3a3020"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-                  <div style={{color:"#b09050",fontSize:"11px"}}>Jugador {i+1}</div>
-                  {jugadores.length>1&&<button style={{background:"none",border:"none",color:"#c04040",cursor:"pointer",fontSize:"14px"}} onClick={()=>remJugador(i)}>✕</button>}
+            {jugadores.map((j,i)=>{
+              const cfgsJ=Object.keys(PRESET_CONFIGS).filter(k=>k.startsWith(j.canchaId+"|"));
+              const jColors=["#1a3a5a","#2a1a3a","#1a3a1a","#3a2a0a"];
+              return(
+                <div key={i} style={{background:"#141210",borderRadius:"6px",padding:"10px",marginBottom:"8px",border:`1px solid ${jColors[i%4]}3a`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                    <div style={{color:"#b09050",fontSize:"11px",letterSpacing:"1px"}}>JUGADOR {i+1}</div>
+                    {jugadores.length>1&&<button style={{background:"none",border:"none",color:"#c04040",cursor:"pointer",fontSize:"14px"}} onClick={()=>remJugador(i)}>✕</button>}
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"8px"}}>
+                    <input placeholder="Nombre" value={j.nombre} onChange={e=>updJ(i,"nombre",e.target.value)} style={{...S.inp,width:"100%"}}/>
+                    <input placeholder="Apellido" value={j.apellido} onChange={e=>updJ(i,"apellido",e.target.value)} style={{...S.inp,width:"100%"}}/>
+                  </div>
+                  <div style={{marginBottom:"8px"}}>
+                    <input type="number" placeholder="HCP" value={j.hcp} onChange={e=>updJ(i,"hcp",e.target.value)} min="0" max="54" style={{...S.inp,width:"80px"}}/>
+                    <span style={{color:"#b09050",fontSize:"10px",marginLeft:"8px"}}>handicap</span>
+                  </div>
+                  <div style={{marginBottom:"6px"}}>
+                    <div style={{color:"#b09050",fontSize:"10px",marginBottom:"3px"}}>CANCHA</div>
+                    <select value={j.canchaId} onChange={e=>onJCanchaChange(i,e.target.value)} style={{...S.inp,width:"100%",fontSize:"13px"}}>
+                      {COURSES.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  {cfgsJ.length>0&&(
+                    <div>
+                      <div style={{color:"#b09050",fontSize:"10px",marginBottom:"3px"}}>CONFIGURACIÓN</div>
+                      <select value={j.configKey} onChange={e=>updJ(i,"configKey",e.target.value)} style={{...S.inp,width:"100%",fontSize:"13px"}}>
+                        <option value="">Sin config (manual)</option>
+                        {cfgsJ.map(k=><option key={k} value={k}>{PRESET_CONFIGS[k].name}</option>)}
+                      </select>
+                    </div>
+                  )}
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"8px"}}>
-                  <input placeholder="Nombre" value={j.nombre} onChange={e=>updJ(i,"nombre",e.target.value)} style={{...S.inp,width:"100%"}}/>
-                  <input placeholder="Apellido" value={j.apellido} onChange={e=>updJ(i,"apellido",e.target.value)} style={{...S.inp,width:"100%"}}/>
-                </div>
-                <div>
-                  <input type="number" placeholder="HCP" value={j.hcp} onChange={e=>updJ(i,"hcp",e.target.value)} min="0" max="54" style={{...S.inp,width:"80px"}}/>
-                  <span style={{color:"#b09050",fontSize:"10px",marginLeft:"8px"}}>handicap</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {err&&<div style={{color:"#c04040",fontSize:"12px",marginBottom:"10px"}}>{err}</div>}
           <button style={{...S.btn("p"),width:"100%",marginTop:"6px"}} onClick={iniciar}>Iniciar Clase →</button>
