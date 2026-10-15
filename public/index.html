@@ -933,13 +933,15 @@ function HoleCard({hole,data,onChange,readonly}){
               </div>
             </div>
             <label style={S.lbl}>Resultado</label>
-            <div style={{display:"flex",gap:"6px"}}>
-              {["green","chip","bunker"].map(r=>(
-                <button key={r} style={{...S.btn(t.resultado===r?(r==="green"?"p":"d"):"g"),flex:1,padding:"8px 4px",fontSize:"12px",textTransform:"capitalize"}} disabled={readonly} onClick={()=>updTiro(i,"resultado",t.resultado===r?"":r)}>
-                  {r==="green"?"✓ Green":r==="chip"?"Chip":"Búnker"}
-                </button>
-              ))}
-            </div>
+            <select value={t.resultado||""} disabled={readonly} onChange={e=>updTiro(i,"resultado",e.target.value)} style={{...S.inp,fontSize:"14px"}}>
+              <option value="">—</option>
+              <option value="green">🟢 Green</option>
+              <option value="chip">🟡 Zona chip</option>
+              <option value="bunker">🟤 Bunker</option>
+              <option value="corto">❌ Corto</option>
+              <option value="largo">❌ Largo</option>
+              <option value="lateral">❌ Lateral</option>
+            </select>
           </div>
         ))}
         {!readonly&&!greenCerrado&&(
