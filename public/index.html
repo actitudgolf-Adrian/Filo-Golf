@@ -1973,7 +1973,7 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     h2:{fontSize:"15px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"14px",borderBottom:`1px solid ${cardBorder}`,paddingBottom:"7px"},
   };
 
-  const j=clase.jugadores[selJ];
+  const j=clase.jugadores[selJ]||clase.jugadores[0]||{nombre:"",apellido:"",hcp:18,holes:{},notas:{},notaGeneral:"",resumenCoach:"",planJuego:{},notasHoyo:{}};
   const hNum=selH;
   const jCol=L?J_COLORS_LIGHT[selJ%4]:J_COLORS[selJ%4];
 
@@ -2597,16 +2597,35 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 }
 
 // ─── CLASE EN CANCHA ──────────────────────────────────────────────────────────
+// Migración defensiva: asegura campos que versiones anteriores podían no tener
+function migrateClase(cl){
+  if(!cl)return null;
+  try{
+    const c=JSON.parse(JSON.stringify(cl));
+    if(!c.numHoles||isNaN(c.numHoles))c.numHoles=9;
+    if(!Array.isArray(c.jugadores))c.jugadores=[];
+    c.jugadores=c.jugadores.map(j=>({
+      nombre:j.nombre||"",apellido:j.apellido||"",hcp:j.hcp||18,
+      canchaId:j.canchaId||"",courseName:j.courseName||"",
+      configKey:j.configKey||"",configName:j.configName||"",
+      holes:j.holes&&typeof j.holes==="object"?j.holes:{},
+      notas:j.notas||{},notaGeneral:j.notaGeneral||"",
+      resumenCoach:j.resumenCoach||"",
+      planJuego:j.planJuego||{},notasHoyo:j.notasHoyo||{}
+    }));
+    return c;
+  }catch(e){return null;}
+}
 function ClaseEnCancha(){
   const CLASE_LS="coach:clases";
   const CLASE_ACTIVE_LS="coach:claseActiva";
   // Recuperar clase activa y fase si la app se cerró en medio de una clase
   const [phase,setPhase]=useState(()=>{
-    const saved=lsGet(CLASE_ACTIVE_LS);
+    const saved=migrateClase(lsGet(CLASE_ACTIVE_LS));
     return saved?"active":"list";
   });
-  const [clases,setClases]=useState(()=>lsGet(CLASE_LS)||[]);
-  const [cur,setCur]=useState(()=>lsGet(CLASE_ACTIVE_LS)||null);
+  const [clases,setClases]=useState(()=>(lsGet(CLASE_LS)||[]).map(migrateClase).filter(Boolean));
+  const [cur,setCur]=useState(()=>migrateClase(lsGet(CLASE_ACTIVE_LS)));
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
   // Estado de navegación de clase activa — a nivel padre para no resetearse al re-render
