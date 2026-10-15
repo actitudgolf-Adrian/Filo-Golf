@@ -877,6 +877,25 @@ function HoleCard({hole,data,onChange,readonly}){
         {!readonly&&<button style={{...S.btn("g"),padding:"8px 14px",fontSize:"13px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲ Cerrar":"📝 Notas"}</button>}
         {readonly&&hasNotes&&<span style={{fontSize:"18px"}}>📝</span>}
       </div>
+      {open&&!readonly&&(
+        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"14px",marginBottom:"12px"}}>
+          <div style={{fontSize:"10px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Anotaciones — Hoyo {hole}</div>
+          <label style={S.lbl}>Tiro de salida (opcional)</label>
+          <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
+            {["Fairway","Rough","Penalidad"].map(op=>(
+              <button key={op} style={{...S.btn(d.salida===op?"p":"g"),flex:1,padding:"10px 4px",fontSize:"13px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
+            ))}
+          </div>
+          {ZONES.map(z=>(
+            <div key={z} style={{marginBottom:"10px"}}>
+              <label style={S.lbl}>{z}</label>
+              <input style={S.inp} placeholder="Nota..." value={d.zones?.[z]||""} onChange={e=>updZ(z,e.target.value)}/>
+            </div>
+          ))}
+          <label style={S.lbl}>Anotación libre</label>
+          <textarea style={{...S.inp,minHeight:"60px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"12px",marginBottom:"12px"}}>
         <div><label style={S.lbl}>Par</label><input style={smInp} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/></div>
         <div><label style={S.lbl}>Dist (yds)</label><input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/></div>
@@ -955,25 +974,7 @@ function HoleCard({hole,data,onChange,readonly}){
           <input style={smInp} type="number" min="0" max="99" placeholder="—" value={d.distPutt1||""} disabled={readonly} onChange={e=>upd("distPutt1",e.target.value)}/>
         </div>
       )}
-      {open&&!readonly&&(
-        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"14px",marginTop:"10px"}}>
-          <div style={{fontSize:"10px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Anotaciones — Hoyo {hole}</div>
-          <label style={S.lbl}>Tiro de salida (opcional)</label>
-          <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
-            {["Fairway","Rough","Penalidad"].map(op=>(
-              <button key={op} style={{...S.btn(d.salida===op?"p":"g"),flex:1,padding:"10px 4px",fontSize:"13px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
-            ))}
-          </div>
-          {ZONES.map(z=>(
-            <div key={z} style={{marginBottom:"10px"}}>
-              <label style={S.lbl}>{z}</label>
-              <input style={S.inp} placeholder="Nota..." value={d.zones?.[z]||""} onChange={e=>updZ(z,e.target.value)}/>
-            </div>
-          ))}
-          <label style={S.lbl}>Anotación libre</label>
-          <textarea style={{...S.inp,minHeight:"60px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
-        </div>
-      )}
+
       {readonly&&hasNotes&&(
         <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px",marginTop:"10px"}}>
           {d.salida&&<div style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>Salida: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.salida}</span></div>}
