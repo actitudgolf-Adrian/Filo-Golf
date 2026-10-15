@@ -1973,7 +1973,7 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     h2:{fontSize:"15px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"14px",borderBottom:`1px solid ${cardBorder}`,paddingBottom:"7px"},
   };
 
-  const j=clase.jugadores[selJ]||clase.jugadores[0]||{nombre:"",apellido:"",hcp:18,holes:{},notas:{},notaGeneral:"",resumenCoach:"",planJuego:{},notasHoyo:{}};
+  const j=clase.jugadores[selJ];
   const hNum=selH;
   const jCol=L?J_COLORS_LIGHT[selJ%4]:J_COLORS[selJ%4];
 
@@ -2087,12 +2087,12 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
                 </div>
               </div>
             </div>
-            {/* Fila 4: tiros a green (dinámico, hasta 7) */}
+            {/* Fila 4: tiros a green dinámicos, hasta 7 */}
             {(()=>{
               const tirosG=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];
               const lastTiro=tirosG[tirosG.length-1];
               const greenCerrado=lastTiro&&(lastTiro.resultado==="green"||lastTiro.resultado==="chip"||lastTiro.resultado==="bunker");
-              function updTiro(i,k,v){const arr=tirosG.map((t,idx)=>idx===i?{...t,[k]:v}:t);updHole(selJ,hNum,"tirosGreen",arr);}
+              function updTiro(i,k,v){updHole(selJ,hNum,"tirosGreen",tirosG.map((t,idx)=>idx===i?{...t,[k]:v}:t));}
               function addTiroG(){if(tirosG.length<7)updHole(selJ,hNum,"tirosGreen",[...tirosG,{dist:"",resultado:""}]);}
               function remTiroG(i){updHole(selJ,hNum,"tirosGreen",tirosG.filter((_,idx)=>idx!==i));}
               return(
@@ -2597,35 +2597,16 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 }
 
 // ─── CLASE EN CANCHA ──────────────────────────────────────────────────────────
-// Migración defensiva: asegura campos que versiones anteriores podían no tener
-function migrateClase(cl){
-  if(!cl)return null;
-  try{
-    const c=JSON.parse(JSON.stringify(cl));
-    if(!c.numHoles||isNaN(c.numHoles))c.numHoles=9;
-    if(!Array.isArray(c.jugadores))c.jugadores=[];
-    c.jugadores=c.jugadores.map(j=>({
-      nombre:j.nombre||"",apellido:j.apellido||"",hcp:j.hcp||18,
-      canchaId:j.canchaId||"",courseName:j.courseName||"",
-      configKey:j.configKey||"",configName:j.configName||"",
-      holes:j.holes&&typeof j.holes==="object"?j.holes:{},
-      notas:j.notas||{},notaGeneral:j.notaGeneral||"",
-      resumenCoach:j.resumenCoach||"",
-      planJuego:j.planJuego||{},notasHoyo:j.notasHoyo||{}
-    }));
-    return c;
-  }catch(e){return null;}
-}
 function ClaseEnCancha(){
   const CLASE_LS="coach:clases";
   const CLASE_ACTIVE_LS="coach:claseActiva";
   // Recuperar clase activa y fase si la app se cerró en medio de una clase
   const [phase,setPhase]=useState(()=>{
-    const saved=migrateClase(lsGet(CLASE_ACTIVE_LS));
+    const saved=lsGet(CLASE_ACTIVE_LS);
     return saved?"active":"list";
   });
-  const [clases,setClases]=useState(()=>(lsGet(CLASE_LS)||[]).map(migrateClase).filter(Boolean));
-  const [cur,setCur]=useState(()=>migrateClase(lsGet(CLASE_ACTIVE_LS)));
+  const [clases,setClases]=useState(()=>lsGet(CLASE_LS)||[]);
+  const [cur,setCur]=useState(()=>lsGet(CLASE_ACTIVE_LS)||null);
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
   // Estado de navegación de clase activa — a nivel padre para no resetearse al re-render
@@ -2648,17 +2629,15 @@ function ClaseEnCancha(){
 
   // ── Setup nueva clase ──────────────────────────────────────────────────────
   function SetupClase(){
+    const defCanchaId="lomas";
+    const defConfigKey="lomas|Lomas Azul";
     const [fecha,setFecha]=useState(new Date().toISOString().slice(0,10));
     const [numHoles,setNumHoles]=useState(9);
-    // jugador: {nombre, apellido, hcp, canchaId, configKey}
-    const defaultCancha="lomas";
-    const defaultCfg="lomas|Lomas Azul";
-    const [jugadores,setJugadores]=useState([{nombre:"",apellido:"",hcp:"18",canchaId:defaultCancha,configKey:defaultCfg}]);
+    const [jugadores,setJugadores]=useState([{nombre:"",apellido:"",hcp:"18",canchaId:defCanchaId,configKey:defConfigKey}]);
     const [err,setErr]=useState("");
 
     function addJugador(){
       if(jugadores.length<4){
-        // copiar cancha/config del último jugador como default
         const last=jugadores[jugadores.length-1];
         setJugadores([...jugadores,{nombre:"",apellido:"",hcp:"18",canchaId:last.canchaId,configKey:last.configKey}]);
       }
@@ -2667,7 +2646,6 @@ function ClaseEnCancha(){
     function updJ(i,k,v){const a=[...jugadores];a[i]={...a[i],[k]:v};setJugadores(a);}
     function onJCanchaChange(i,cid){
       const cfgs=Object.keys(PRESET_CONFIGS).filter(k=>k.startsWith(cid+"|"));
-      updJ(i,"canchaId",cid);
       const a=[...jugadores];a[i]={...a[i],canchaId:cid,configKey:cfgs.length?cfgs[0]:""};setJugadores(a);
     }
 
@@ -2675,7 +2653,6 @@ function ClaseEnCancha(){
       const js=jugadores.filter(j=>j.nombre.trim()||j.apellido.trim());
       if(!js.length){setErr("Agregá al menos un jugador");return;}
       for(const j of js){if(!j.nombre.trim()||!j.apellido.trim()){setErr("Completá nombre y apellido de cada jugador");return;}}
-      // Nombre del curso para la clase: usar el del primer jugador
       const course0=COURSES.find(c=>c.id===js[0].canchaId)||COURSES[0];
       const nuevaClase={
         id:"clase_"+Date.now(),
@@ -2685,7 +2662,6 @@ function ClaseEnCancha(){
         jugadores:js.map(j=>{
           const course=COURSES.find(c=>c.id===j.canchaId)||COURSES[0];
           const cfg=j.configKey?PRESET_CONFIGS[j.configKey]:null;
-          // Pre-cargar hoyos del rango seleccionado (numHoles primeros)
           const holesBase={};
           if(cfg){
             Object.entries(cfg.holes).forEach(([h,v])=>{
@@ -2696,7 +2672,7 @@ function ClaseEnCancha(){
           return{
             nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,
             canchaId:j.canchaId,courseName:course.name,
-            configKey:j.configKey,configName:cfg?cfg.name:"",
+            configKey:j.configKey||"",configName:cfg?cfg.name:"",
             holes:JSON.parse(JSON.stringify(holesBase)),
             notas:{},notaGeneral:"",resumenCoach:"",planJuego:{},notasHoyo:{}
           };
@@ -2730,9 +2706,8 @@ function ClaseEnCancha(){
             </div>
             {jugadores.map((j,i)=>{
               const cfgsJ=Object.keys(PRESET_CONFIGS).filter(k=>k.startsWith(j.canchaId+"|"));
-              const jColors=["#1a3a5a","#2a1a3a","#1a3a1a","#3a2a0a"];
               return(
-                <div key={i} style={{background:"#141210",borderRadius:"6px",padding:"10px",marginBottom:"8px",border:`1px solid ${jColors[i%4]}3a`}}>
+                <div key={i} style={{background:"#141210",borderRadius:"6px",padding:"10px",marginBottom:"8px",border:"1px solid #3a3020"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                     <div style={{color:"#b09050",fontSize:"11px",letterSpacing:"1px"}}>JUGADOR {i+1}</div>
                     {jugadores.length>1&&<button style={{background:"none",border:"none",color:"#c04040",cursor:"pointer",fontSize:"14px"}} onClick={()=>remJugador(i)}>✕</button>}
@@ -2758,6 +2733,7 @@ function ClaseEnCancha(){
                         <option value="">Sin config (manual)</option>
                         {cfgsJ.map(k=><option key={k} value={k}>{PRESET_CONFIGS[k].name}</option>)}
                       </select>
+                      {j.configKey&&<div style={{color:"#8a9a70",fontSize:"11px",marginTop:"3px"}}>✓ Datos precargados (editables en tarjeta)</div>}
                     </div>
                   )}
                 </div>
