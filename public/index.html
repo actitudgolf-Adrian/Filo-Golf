@@ -2100,11 +2100,11 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                     <span style={{fontSize:"11px",color:(L?"#5a3a10":gold),letterSpacing:"1px",textTransform:"uppercase",fontWeight:"bold"}}>Tiros a Green</span>
                     {!greenCerrado&&tirosG.length<7&&(
-                      <button onClick={addTiroG} style={{...SC.btn("g"),padding:"4px 12px",fontSize:"12px"}}>+ Tiro</button>
+                      <button onClick={addTiroG} style={{background:L?"#e8f0e0":"#2a3a20",color:L?"#3a6020":"#8aba60",border:`1px solid ${L?"#b0c890":"#4a6a30"}`,borderRadius:"4px",padding:"4px 12px",fontSize:"12px",cursor:"pointer"}}>+ Tiro</button>
                     )}
                   </div>
                   {tirosG.length===0&&(
-                    <button onClick={addTiroG} style={{...SC.btn("g"),width:"100%",padding:"8px",fontSize:"12px",marginBottom:"4px"}}>+ Agregar tiro a green</button>
+                    <button onClick={addTiroG} style={{background:L?"#e8f0e0":"#2a3a20",color:L?"#3a6020":"#8aba60",border:`1px solid ${L?"#b0c890":"#4a6a30"}`,borderRadius:"4px",width:"100%",padding:"8px",fontSize:"12px",marginBottom:"4px",cursor:"pointer"}}>+ Agregar tiro a green</button>
                   )}
                   {tirosG.map((t,i)=>(
                     <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"6px",alignItems:"end",marginBottom:"7px"}}>
@@ -2124,7 +2124,7 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
                           <option value="lateral">❌ Lateral</option>
                         </select>
                       </div>
-                      <button onClick={()=>remTiroG(i)} style={{...SC.btn("d"),padding:"9px 10px",fontSize:"14px",lineHeight:1}}>✕</button>
+                      <button onClick={()=>remTiroG(i)} style={{background:L?"#f8e8e8":"#3a2020",color:L?"#c04040":"#e06060",border:`1px solid ${L?"#e0a0a0":"#6a3030"}`,borderRadius:"4px",padding:"9px 10px",fontSize:"14px",lineHeight:1,cursor:"pointer"}}>✕</button>
                     </div>
                   ))}
                 </div>
