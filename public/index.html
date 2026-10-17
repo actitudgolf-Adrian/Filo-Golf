@@ -2398,7 +2398,6 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
   const [recStatus,setRecStatus]=useState("idle");
   const [verPlan,setVerPlan]=useState(false);
   const [verAnotaciones,setVerAnotaciones]=useState(true);
-  const [previewUrl,setPreviewUrl]=useState(null);
 
   const L=lightMode||false;
   const bg=L?"#f5f0e8":"#0f0d0a";
@@ -2563,25 +2562,12 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 <div class="footer"><span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span></div>
 </body></html>`;
 
-    return html;
-  }
-
-  function descargarHTML(jIdx){
-    const j=clase.jugadores[jIdx];
-    const html=generarPDF(jIdx);
     const blob=new Blob([html],{type:"text/html"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
     a.href=url;a.download=`FiloGolf_${j.apellido}_${clase.fecha}.html`;
     document.body.appendChild(a);a.click();
     setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
-  }
-
-  function previsualizarHTML(jIdx){
-    if(previewUrl)URL.revokeObjectURL(previewUrl);
-    const html=generarPDF(jIdx);
-    const blob=new Blob([html],{type:"text/html"});
-    setPreviewUrl(URL.createObjectURL(blob));
   }
 
   const j=clase.jugadores[selJ];
@@ -2759,37 +2745,11 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
             readOnly={!onUpdate}/>
         </div>
 
-        <div style={{display:"flex",gap:"8px"}}>
-          <button style={{flex:1,background:L?"#e8f0e0":"#1a2a12",color:L?"#2a5a10":"#6abf6a",border:`1px solid ${L?"#6a9a30":"#3a6a2a"}`,borderRadius:"4px",padding:"11px 10px",fontSize:"13px",cursor:"pointer",fontWeight:"bold"}}
-            onClick={()=>previsualizarHTML(selJ)}>
-            👁 Previsualizar
-          </button>
-          <button style={{flex:1,background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"11px 10px",fontSize:"13px",cursor:"pointer",fontWeight:"bold"}}
-            onClick={()=>descargarHTML(selJ)}>
-            ↓ Descargar
-          </button>
-        </div>
+        <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",width:"100%"}} onClick={()=>generarPDF(selJ)}>
+          ↓ Descargar Informe del Jugador
+        </button>
       </div>
     </div>
-
-    {previewUrl&&(
-      <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.88)",zIndex:9999,display:"flex",flexDirection:"column"}}>
-        <div style={{background:"#1a1612",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0,borderBottom:"1px solid #5a4a20"}}>
-          <div style={{color:gold,fontWeight:"bold",fontSize:"14px"}}>👁 Vista previa — podés editar el Resumen antes de descargar</div>
-          <div style={{display:"flex",gap:"8px"}}>
-            <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"8px 14px",fontSize:"12px",cursor:"pointer",fontWeight:"bold"}}
-              onClick={()=>{descargarHTML(selJ);URL.revokeObjectURL(previewUrl);setPreviewUrl(null);}}>
-              ↓ Descargar
-            </button>
-            <button style={{background:"#2d2720",color:"#f5ead0",border:"1px solid #5a4a20",borderRadius:"4px",padding:"8px 12px",fontSize:"12px",cursor:"pointer"}}
-              onClick={()=>{URL.revokeObjectURL(previewUrl);setPreviewUrl(null);}}>
-              ✕ Cerrar
-            </button>
-          </div>
-        </div>
-        <iframe src={previewUrl} style={{flex:1,border:"none",background:"#fff"}} title="Vista previa del informe"/>
-      </div>
-    )}
   );
 }
 
@@ -2999,7 +2959,6 @@ function ClaseEnCancha(){
   },[]);
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
-  const [claseView,setClaseView]=useState("historial"); // "historial"|"stats"
   // Estado de navegación de clase activa — a nivel padre para no resetearse al re-render
   const [selJ,setSelJ]=useState(0);
   const [selH,setSelH]=useState(1);
@@ -3181,6 +3140,8 @@ function ClaseEnCancha(){
     if(cur&&cur.id===id){setCurPersist(null);setCur(null);}
   }
 
+  const [claseView,setClaseView]=useState("historial"); // "historial"|"stats"
+
   // Historial alfabético
   const byAlumno={};
   clases.forEach(cl=>{
@@ -3261,7 +3222,6 @@ function ClaseEnCancha(){
 }
 
 // ─── END CLASE EN CANCHA ──────────────────────────────────────────────────────
-
 
 function AdminPanel(){
   const [codes,setCodes]=useState([]);
