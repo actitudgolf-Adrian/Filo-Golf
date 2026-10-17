@@ -3198,7 +3198,7 @@ function ClaseEnCancha(){
               <div style={{color:gold,fontSize:"13px",fontWeight:"bold",marginBottom:"10px"}}>{a.apellido}, {a.nombre}</div>
               {clasesAlumno.map(cl=>{
                 const jd=cl.jugadores.find(j=>j.apellido===a.apellido&&j.nombre===a.nombre);
-                const total=jd?Object.values(jd.holes).reduce((s,h)=>s+(parseInt(h.shots)||0),0):0;
+                const total=jd?Object.values(jd.holes||{}).reduce((s,h)=>s+(parseInt(h.shots)||0),0):0;
                 return(
                   <div key={cl.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #3a3020"}}>
                     <div style={{flex:1,cursor:"pointer"}} onClick={()=>setSelClase(cl)}>
