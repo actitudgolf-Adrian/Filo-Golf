@@ -39,7 +39,37 @@ async function sbD(table,match){try{const q=Object.entries(match).map(([k,v])=>`
 function lsGet(k){try{const v=localStorage.getItem("fg_"+k);return v?JSON.parse(v):null}catch{return null}}
 function lsSet(k,v){try{localStorage.setItem("fg_"+k,JSON.stringify(v));return true}catch{return false}}
 
-const INVITE="ACTITUDGOLF",COACH_U="coach",COACH_P="FILOCOCOACH";
+const COACH_U="coach",COACH_P="FILOCOCOACH";
+
+// Genera un código aleatorio de 8 caracteres
+function genCode(){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let c="";for(let i=0;i<8;i++)c+=chars[Math.floor(Math.random()*chars.length)];return c;}
+
+async function sbCreateInviteCode(assignedTo){
+  const code=genCode();
+  const ok=await sbU("invite_codes",{code,created_by:"coach",assigned_to:assignedTo||"",used_by:null,used_at:null,created_at:Date.now()});
+  return ok?code:null;
+}
+async function sbLoadInviteCodes(){
+  try{const r=await fetch(SB_URL+"/rest/v1/invite_codes?order=created_at.desc",{headers:H});if(!r.ok)return[];return await r.json();}catch{return[];}
+}
+async function sbDeleteInviteCode(code){
+  return await sbD("invite_codes",{code});
+}
+async function sbUseInviteCode(code,username){
+  const q=`code=eq.${encodeURIComponent(code)}`;
+  try{
+    // Verificar que existe y no fue usado
+    const r=await fetch(SB_URL+"/rest/v1/invite_codes?"+q+"&limit=1",{headers:H});
+    if(!r.ok)return {ok:false,err:"Error al verificar código."};
+    const rows=await r.json();
+    if(!rows||!rows.length)return {ok:false,err:"Código de invitación inválido."};
+    if(rows[0].used_by)return {ok:false,err:"Este código ya fue utilizado."};
+    // Marcar como usado
+    const patch=await fetch(SB_URL+"/rest/v1/invite_codes?"+q,{method:"PATCH",headers:H,body:JSON.stringify({used_by:username,used_at:Date.now()})});
+    if(!patch.ok)return {ok:false,err:"Error al registrar código."};
+    return {ok:true,assignedTo:rows[0].assigned_to||""};
+  }catch{return {ok:false,err:"Sin conexión. Verificá internet e intentá de nuevo."};}
+}
 
 const COURSES=[
   {id:"arelauquen",name:"Arelauquen Golf & CC",holes:18,par:72,city:"Bariloche"},
@@ -789,12 +819,15 @@ function Auth({onLogin}){
   async function register(){
     setErr("");setBusy(true);
     try{
-      if(f.code.trim().toUpperCase()!==INVITE){setErr("Código de invitación inválido.");return}
+      if(!f.code.trim()){setErr("Ingresá el código de invitación.");return}
       if(!f.user.trim()||!f.pass||!f.name.trim()){setErr("Completá todos los campos.");return}
       const u=f.user.trim().toLowerCase().replace(/\s/g,"");
       if(u===COACH_U){setErr("Ese usuario no está disponible.");return}
       const exists=await sbQ(`users?username=eq.${u}&limit=1`);
       if((exists&&exists.length)||lsGet("user:"+u)){setErr("Ese usuario ya existe.");return}
+      // Validar y quemar el código de invitación
+      const codeRes=await sbUseInviteCode(f.code.trim().toUpperCase(),u);
+      if(!codeRes.ok){setErr(codeRes.err);return}
       const hcp=parseFloat(f.hcp)||18;
       const ud={username:u,name:f.name.trim(),hcp:hcp,hcpT:f.hcpT,isCoach:false};
       await sbU("users",{username:u,name:ud.name,hcp:hcp,hcpt:f.hcpT,joined_at:Date.now()});
@@ -2936,6 +2969,90 @@ function ClaseEnCancha(){
 
 // ─── END CLASE EN CANCHA ──────────────────────────────────────────────────────
 
+function AdminPanel(){
+  const [codes,setCodes]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [newName,setNewName]=useState("");
+  const [creating,setCreating]=useState(false);
+  const [msg,setMsg]=useState(null); // {type:"ok"|"err", text}
+
+  async function loadCodes(){
+    setLoading(true);
+    const rows=await sbLoadInviteCodes();
+    setCodes(rows||[]);
+    setLoading(false);
+  }
+  useEffect(()=>{loadCodes();},[]);
+
+  async function createCode(){
+    if(creating)return;
+    setCreating(true);setMsg(null);
+    const code=await sbCreateInviteCode(newName.trim());
+    if(code){setNewName("");setMsg({type:"ok",text:`Código creado: ${code}`});await loadCodes();}
+    else setMsg({type:"err",text:"Error al crear código. Verificá conexión."});
+    setCreating(false);
+  }
+
+  async function deleteCode(code){
+    if(!window.confirm(`¿Eliminar código ${code}?`))return;
+    setMsg(null);
+    const ok=await sbDeleteInviteCode(code);
+    if(ok){setMsg({type:"ok",text:"Código eliminado."});await loadCodes();}
+    else setMsg({type:"err",text:"Error al eliminar."});
+  }
+
+  const pending=codes.filter(c=>!c.used_by);
+  const used=codes.filter(c=>c.used_by);
+
+  return(
+    <div>
+      <div style={{...S.card,marginBottom:"14px"}}>
+        <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Crear código de invitación</div>
+        <label style={S.lbl}>Para quién (opcional)</label>
+        <input style={{...S.inp,marginBottom:"10px"}} placeholder="Ej: Juan Pérez" value={newName} onChange={e=>setNewName(e.target.value)}/>
+        <button style={{...S.btn("g"),width:"100%"}} onClick={createCode} disabled={creating}>{creating?"Creando...":"+ Generar código"}</button>
+        {msg&&<div style={{background:msg.type==="ok"?"#1a2a1a":"#3a1010",border:`1px solid ${msg.type==="ok"?"#2a5a2a":"#7a2020"}`,borderRadius:"4px",padding:"9px 13px",fontSize:"13px",color:msg.type==="ok"?"#8e8":"#e88",marginTop:"10px",wordBreak:"break-all"}}>{msg.text}</div>}
+      </div>
+
+      {loading?<div style={{color:"#b09050",textAlign:"center",padding:"20px"}}>Cargando...</div>:<>
+        {pending.length>0&&<>
+          <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Códigos disponibles ({pending.length})</div>
+          {pending.map(c=>(
+            <div key={c.code} style={{...S.card,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",marginBottom:"8px"}}>
+              <div>
+                <div style={{color:"#f5ead0",fontSize:"15px",fontWeight:"bold",letterSpacing:"2px"}}>{c.code}</div>
+                {c.assigned_to&&<div style={{color:"#b09050",fontSize:"11px"}}>Para: {c.assigned_to}</div>}
+                <div style={{color:"#b09050",fontSize:"10px"}}>{c.created_at?new Date(c.created_at).toLocaleDateString("es-AR"):""}</div>
+              </div>
+              <button onClick={()=>deleteCode(c.code)} style={{...S.btn("d"),fontSize:"11px",padding:"5px 9px"}}>✕ Borrar</button>
+            </div>
+          ))}
+        </>}
+        {pending.length===0&&!loading&&<div style={{...S.card,color:"#b09050",textAlign:"center",padding:"20px",marginBottom:"12px"}}>No hay códigos disponibles.</div>}
+
+        {used.length>0&&<>
+          <div style={{color:"#6a7a50",fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase",margin:"16px 0 8px"}}>Códigos ya usados ({used.length})</div>
+          {used.map(c=>(
+            <div key={c.code} style={{...S.card,padding:"10px 12px",marginBottom:"8px",opacity:0.7}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{color:"#b09050",fontSize:"13px",letterSpacing:"1px",textDecoration:"line-through"}}>{c.code}</div>
+                  {c.assigned_to&&<div style={{color:"#b09050",fontSize:"11px"}}>Para: {c.assigned_to}</div>}
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:"#6a9a50",fontSize:"11px"}}>✓ Usado por</div>
+                  <div style={{color:"#f5ead0",fontSize:"12px"}}>{c.used_by}</div>
+                  {c.used_at&&<div style={{color:"#b09050",fontSize:"10px"}}>{new Date(c.used_at).toLocaleDateString("es-AR")}</div>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </>}
+      </>}
+    </div>
+  );
+}
+
 function CoachPanel(){
   // Si hay una clase activa guardada, arrancar directo en ese tab
   const [tab,setTab]=useState(()=>lsGet("coach:claseActiva")?"clase":"ranking");
@@ -2987,7 +3104,7 @@ function CoachPanel(){
         <button style={{...S.btn("g"),fontSize:"11px",padding:"6px 10px"}} onClick={loadAll}>{loading?"⟳...":"⟳ Actualizar"}</button>
       </div>
       <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"16px"}}>
-        {[["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"],["clase","Clase en Cancha"]].map(([t,l])=>(
+        {[["ranking","Ranking"],["players","Jugadores"],["rounds","Vueltas"],["clase","Clase"],["admin","Admin"]].map(([t,l])=>(
           <button key={t} style={S.nb(tab===t)} onClick={()=>{setTab(t);setSelPlayer(null);setSelPlayerTab("vueltas")}}>{l}</button>
         ))}
       </div>
@@ -3114,6 +3231,8 @@ function CoachPanel(){
       )}
 
       {tab==="clase"&&<ClaseEnCancha/>}
+
+      {tab==="admin"&&<AdminPanel/>}
 
       {tab==="rounds"&&!loading&&(
         allRounds().length===0
