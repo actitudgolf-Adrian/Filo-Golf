@@ -2398,6 +2398,7 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
   const [recStatus,setRecStatus]=useState("idle");
   const [verPlan,setVerPlan]=useState(false);
   const [verAnotaciones,setVerAnotaciones]=useState(true);
+  const [previewHtml,setPreviewHtml]=useState(null);
 
   const L=lightMode||false;
   const bg=L?"#f5f0e8":"#0f0d0a";
@@ -2562,12 +2563,23 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 <div class="footer"><span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span></div>
 </body></html>`;
 
+    return html;
+  }
+
+  function descargarInforme(jIdx){
+    const html=generarPDF(jIdx);
+    const j=clase.jugadores[jIdx];
     const blob=new Blob([html],{type:"text/html"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
     a.href=url;a.download=`FiloGolf_${j.apellido}_${clase.fecha}.html`;
     document.body.appendChild(a);a.click();
     setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+  }
+
+  function previsualizarInforme(jIdx){
+    const html=generarPDF(jIdx);
+    setPreviewHtml(html);
   }
 
   const j=clase.jugadores[selJ];
@@ -2745,10 +2757,28 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
             readOnly={!onUpdate}/>
         </div>
 
-        <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",width:"100%"}} onClick={()=>generarPDF(selJ)}>
-          ↓ Descargar Informe del Jugador
-        </button>
+        <div style={{display:"flex",gap:"8px"}}>
+          <button style={{background:L?"#e8f0e0":"#182010",color:L?"#3a6010":"#a8d070",border:`2px solid ${L?"#6a9a30":"#4a7a18"}`,borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1}} onClick={()=>previsualizarInforme(selJ)}>
+            👁 Previsualizar Informe
+          </button>
+          <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1}} onClick={()=>descargarInforme(selJ)}>
+            ↓ Descargar Informe
+          </button>
+        </div>
       </div>
+
+      {previewHtml&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.85)",zIndex:9999,display:"flex",flexDirection:"column"}}>
+          <div style={{background:"#1a1612",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #5a4a20"}}>
+            <span style={{color:gold,fontWeight:"bold",fontSize:"14px"}}>👁 Vista previa del informe</span>
+            <div style={{display:"flex",gap:"8px"}}>
+              <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"7px 14px",fontSize:"12px",cursor:"pointer",fontWeight:"bold"}} onClick={()=>{descargarInforme(selJ);setPreviewHtml(null);}}>↓ Descargar</button>
+              <button style={{background:"#2d2720",color:"#f5ead0",border:"1px solid #5a4a20",borderRadius:"4px",padding:"7px 14px",fontSize:"12px",cursor:"pointer"}} onClick={()=>setPreviewHtml(null)}>✕ Cerrar</button>
+            </div>
+          </div>
+          <iframe srcDoc={previewHtml} style={{flex:1,border:"none",background:"#fff"}} title="Vista previa informe"/>
+        </div>
+      )}
     </div>
   );
 }
