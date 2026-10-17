@@ -2653,26 +2653,29 @@ function ClaseEnCancha(){
   const [cur,setCur]=useState(()=>lsGet(CLASE_ACTIVE_LS)||null);
   const [syncStatus,setSyncStatus]=useState("idle"); // "idle"|"syncing"|"ok"|"err"
 
-  // Al montar: bajar clases de Supabase y fusionar con localStorage
+  // Al montar: subir locales huérfanas + bajar de Supabase y fusionar
   useEffect(()=>{
-    async function fetchRemote(){
+    async function syncAll(){
       setSyncStatus("syncing");
+      // 1) Subir todas las clases locales que no están en Supabase todavía
+      const local=lsGet(CLASE_LS)||[];
+      if(local.length>0){
+        await Promise.all(local.map(c=>sbUpsertClase(c)));
+      }
+      // 2) Bajar todo desde Supabase
       const remote=await sbLoadClases();
-      if(!remote){setSyncStatus("idle");return;}
-      setClases(prev=>{
-        const local=lsGet(CLASE_LS)||prev;
-        // Fusionar: remote tiene prioridad por id, pero conservar locales que no estén en remote
-        const map={};
-        local.forEach(c=>{map[c.id]=c;});
-        remote.forEach(c=>{map[c.id]=c;});
-        const merged=Object.values(map).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-        lsSet(CLASE_LS,merged);
-        return merged;
-      });
+      if(!remote){setSyncStatus("err");return;}
+      // 3) Fusionar: remote tiene prioridad (es la fuente de verdad)
+      const map={};
+      local.forEach(c=>{map[c.id]=c;});
+      remote.forEach(c=>{map[c.id]=c;});
+      const merged=Object.values(map).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      lsSet(CLASE_LS,merged);
+      setClases(merged);
       setSyncStatus("ok");
-      setTimeout(()=>setSyncStatus("idle"),2000);
+      setTimeout(()=>setSyncStatus("idle"),3000);
     }
-    fetchRemote();
+    syncAll();
   },[]);
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
