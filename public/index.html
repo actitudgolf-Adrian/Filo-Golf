@@ -2959,6 +2959,7 @@ function ClaseEnCancha(){
   },[]);
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
+  const [claseView,setClaseView]=useState("historial"); // "historial"|"stats"
   // Estado de navegación de clase activa — a nivel padre para no resetearse al re-render
   const [selJ,setSelJ]=useState(0);
   const [selH,setSelH]=useState(1);
@@ -3140,8 +3141,6 @@ function ClaseEnCancha(){
     if(cur&&cur.id===id){setCurPersist(null);setCur(null);}
   }
 
-  const [claseView,setClaseView]=useState("historial"); // "historial"|"stats"
-
   // Historial alfabético
   const byAlumno={};
   clases.forEach(cl=>{
@@ -3222,6 +3221,7 @@ function ClaseEnCancha(){
 }
 
 // ─── END CLASE EN CANCHA ──────────────────────────────────────────────────────
+
 
 function AdminPanel(){
   const [codes,setCodes]=useState([]);
