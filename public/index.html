@@ -2611,6 +2611,36 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 }
 
 // ─── CLASE EN CANCHA ──────────────────────────────────────────────────────────
+// ── Sync helpers para clases en cancha ──────────────────────────────────────
+async function sbUpsertClase(clase){
+  try{
+    const payload={
+      id:clase.id,
+      coach_username:"coach",
+      fecha:clase.fecha||"",
+      data:clase,
+      finalizada:!!clase.finalizada,
+      created_at:clase.createdAt||Date.now()
+    };
+    const r=await fetch(SB_URL+"/rest/v1/clases",{
+      method:"POST",
+      headers:{...H,"Prefer":"resolution=merge-duplicates"},
+      body:JSON.stringify(payload)
+    });
+    return r.ok;
+  }catch{return false;}
+}
+
+async function sbLoadClases(){
+  try{
+    const r=await fetch(SB_URL+"/rest/v1/clases?coach_username=eq.coach&order=created_at.desc",{headers:H});
+    if(!r.ok)return null;
+    const rows=await r.json();
+    return rows.map(row=>row.data).filter(Boolean);
+  }catch{return null;}
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 function ClaseEnCancha(){
   const CLASE_LS="coach:clases";
   const CLASE_ACTIVE_LS="coach:claseActiva";
@@ -2621,6 +2651,29 @@ function ClaseEnCancha(){
   });
   const [clases,setClases]=useState(()=>lsGet(CLASE_LS)||[]);
   const [cur,setCur]=useState(()=>lsGet(CLASE_ACTIVE_LS)||null);
+  const [syncStatus,setSyncStatus]=useState("idle"); // "idle"|"syncing"|"ok"|"err"
+
+  // Al montar: bajar clases de Supabase y fusionar con localStorage
+  useEffect(()=>{
+    async function fetchRemote(){
+      setSyncStatus("syncing");
+      const remote=await sbLoadClases();
+      if(!remote){setSyncStatus("idle");return;}
+      setClases(prev=>{
+        const local=lsGet(CLASE_LS)||prev;
+        // Fusionar: remote tiene prioridad por id, pero conservar locales que no estén en remote
+        const map={};
+        local.forEach(c=>{map[c.id]=c;});
+        remote.forEach(c=>{map[c.id]=c;});
+        const merged=Object.values(map).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+        lsSet(CLASE_LS,merged);
+        return merged;
+      });
+      setSyncStatus("ok");
+      setTimeout(()=>setSyncStatus("idle"),2000);
+    }
+    fetchRemote();
+  },[]);
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
   // Estado de navegación de clase activa — a nivel padre para no resetearse al re-render
@@ -2632,7 +2685,13 @@ function ClaseEnCancha(){
 
   function toggleLight(v){setLightMode(v);lsSet("coach:lightMode",v);}
 
-  function saveClases(arr){setClases(arr);lsSet(CLASE_LS,arr);}
+  function saveClases(arr,claseModificada){
+    setClases(arr);
+    lsSet(CLASE_LS,arr);
+    // Subir a Supabase la clase que cambió (o todas si no se especifica)
+    const toSync=claseModificada?[claseModificada]:arr;
+    toSync.forEach(c=>{sbUpsertClase(c).then(ok=>{if(ok){setSyncStatus("ok");setTimeout(()=>setSyncStatus("idle"),2000);}else{setSyncStatus("err");}});});
+  }
 
   // Persiste la clase activa en cada cambio — sobrevive salida de la app
   function setCurPersist(claseObj){
@@ -2690,6 +2749,7 @@ function ClaseEnCancha(){
         finalizada:false,createdAt:Date.now()
       };
       setCurPersist(nuevaClase);setSelJ(0);setSelH(1);setSubTab("tarjeta");setPhase("active");
+      sbUpsertClase(nuevaClase);
     }
 
     return(
@@ -2769,24 +2829,24 @@ function ClaseEnCancha(){
     recStatus={recStatus} setRecStatus={setRecStatus}
     onUpdate={next=>{setCurPersist(next);setCur(next);}}
     onFinalizar={next=>{setCurPersist(next);setCur(next);setPhase("report");}}
-    onGuardar={(next,arr)=>{setCurPersist(next);setCur(next);saveClases(arr);}}
+    onGuardar={(next,arr)=>{setCurPersist(next);setCur(next);saveClases(arr,next);}}
     lightMode={lightMode} setLightMode={toggleLight}
   />;
   if(phase==="report"){
     function guardarYSalir(){
       const arr=[...clases.filter(c=>c.id!==cur.id),cur];
-      saveClases(arr);
+      saveClases(arr,cur);
       setCurPersist(null); // limpia el activo — ya quedó guardado en historial
       setPhase("list");setCur(null);
     }
     return <ReporteClase clase={cur} onBack={guardarYSalir} onUpdate={next=>{
       const arr=[...clases.filter(c=>c.id!==next.id),next];
-      saveClases(arr);setCurPersist(next);setCur(next);
+      saveClases(arr,next);setCurPersist(next);setCur(next);
     }} lightMode={lightMode} setLightMode={toggleLight}/>;
   }
   if(selClase)return <ReporteClase clase={selClase} onBack={()=>setSelClase(null)} onUpdate={next=>{
     const arr=[...clases.filter(c=>c.id!==next.id),next];
-    saveClases(arr);setSelClase(next);
+    saveClases(arr,next);setSelClase(next);
   }} lightMode={lightMode} setLightMode={toggleLight}/>;
 
   function eliminarClase(id){
@@ -2811,7 +2871,12 @@ function ClaseEnCancha(){
   return(
     <div style={S.page}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
-        <div style={S.h2}>Clases en Cancha</div>
+        <div>
+          <div style={S.h2}>Clases en Cancha</div>
+          {syncStatus==="syncing"&&<div style={{fontSize:"10px",color:"#b09050",marginTop:"2px"}}>⟳ Sincronizando...</div>}
+          {syncStatus==="ok"&&<div style={{fontSize:"10px",color:"#6a9a50",marginTop:"2px"}}>✓ Sincronizado</div>}
+          {syncStatus==="err"&&<div style={{fontSize:"10px",color:"#c04040",marginTop:"2px"}}>⚠ Sin conexión — guardado local</div>}
+        </div>
         <button style={S.btn("p")} onClick={()=>setPhase("setup")}>+ Nueva Clase</button>
       </div>
 
