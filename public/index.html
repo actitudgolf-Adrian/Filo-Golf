@@ -891,19 +891,22 @@ function HoleCard({hole,data,onChange,readonly}){
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
   function startVoiceNote(){
+    if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
     if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
-      alert("⚠️ Reconocimiento de voz no disponible en este navegador.");return;
+      alert("⚠️ Reconocimiento de voz no disponible en este dispositivo.");return;
     }
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec=new SR();
     rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
     setRecStatus("recording");
+    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},10000);
     rec.onresult=e=>{
+      clearTimeout(timeout);
       const txt=e.results[0][0].transcript;
       upd("note",(d.note||"")+(d.note?" ":"")+txt);
       setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
     };
-    rec.onerror=()=>{setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);};
+    rec.onerror=()=>{clearTimeout(timeout);setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);};
     rec.start();
   }
   const hasNotes=Object.values(d.zones||{}).some(Boolean)||d.note||d.salida;
@@ -2441,17 +2444,20 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
     onUpdate(next);
   }
   function startVoiceR(jIdx,campo){
-    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert("⚠️ Reconocimiento de voz no disponible.");return;}
+    if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert("⚠️ Reconocimiento de voz no disponible en este dispositivo.");return;}
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec=new SR();
     rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
     setRecStatus(campo+"_"+jIdx);
+    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},10000);
     rec.onresult=e=>{
+      clearTimeout(timeout);
       const txt2=e.results[0][0].transcript;
       updJugador(jIdx,j=>{j[campo]=(j[campo]||"")+(txt2?" "+txt2:"");});
       setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
     };
-    rec.onerror=()=>setRecStatus("idle");
+    rec.onerror=()=>{clearTimeout(timeout);setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);};
     rec.start();
   }
 
