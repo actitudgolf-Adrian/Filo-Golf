@@ -890,6 +890,25 @@ function HoleCard({hole,data,onChange,readonly}){
   const d=data||{shots:"",putts:"",chips:0,bunker:0,tirosGreen:[],par:"",dist:"",hcpIdx:"",distPutt1:"",salida:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
+  function startVoiceZone(zona){
+    if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+      alert("⚠️ Reconocimiento de voz no disponible en este dispositivo.");return;
+    }
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const rec=new SR();
+    rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
+    setRecStatus("zone_"+zona);
+    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},10000);
+    rec.onresult=e=>{
+      clearTimeout(timeout);
+      const txt=e.results[0][0].transcript;
+      updZ(zona,(d.zones?.[zona]||"")+(d.zones?.[zona]?" ":"")+txt);
+      setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
+    };
+    rec.onerror=()=>{clearTimeout(timeout);setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);};
+    rec.start();
+  }
   function startVoiceNote(){
     if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
     if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
@@ -945,7 +964,12 @@ function HoleCard({hole,data,onChange,readonly}){
           </div>
           {ZONES.map(z=>(
             <div key={z} style={{marginBottom:"10px"}}>
-              <label style={S.lbl}>{z}</label>
+              <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
+                <label style={{...S.lbl,marginBottom:0,flex:1}}>{z}</label>
+                {voiceBtn(recStatus,"zone_"+z,()=>startVoiceZone(z),false)}
+                {recStatus==="done"&&<span style={{fontSize:"11px",color:"#6abf6a"}}>✓</span>}
+                {recStatus==="error"&&<span style={{fontSize:"11px",color:"#cf6679"}}>✗</span>}
+              </div>
               <input style={S.inp} placeholder="Nota..." value={d.zones?.[z]||""} onChange={e=>updZ(z,e.target.value)}/>
             </div>
           ))}
