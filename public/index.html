@@ -1073,14 +1073,15 @@ function NewRound({user,onSave,onCancel,editRound}){
   },[meta,holes,plan0]);
 
   function startVoicePlan(campo){
-    if(!navigator.onLine){alert("🎤 El micrófono requiere conexión a internet.");return;}
-    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert("⚠️ Reconocimiento de voz no disponible.");return;}
+    if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert("⚠️ Reconocimiento de voz no disponible en este dispositivo.");return;}
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec=new SR();
     rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
     setRecPlan(campo);
-    rec.onresult=e=>{const txt=e.results[0][0].transcript;setPlan0(p=>({...p,[campo]:(p[campo]||"")+(p[campo]?" ":"")+txt}));setRecPlan("done");setTimeout(()=>setRecPlan("idle"),2000);};
-    rec.onerror=()=>{setRecPlan("error");setTimeout(()=>setRecPlan("idle"),2000);};
+    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecPlan("error");setTimeout(()=>setRecPlan("idle"),2000);},10000);
+    rec.onresult=e=>{clearTimeout(timeout);const txt=e.results[0][0].transcript;setPlan0(p=>({...p,[campo]:(p[campo]||"")+(p[campo]?" ":"")+txt}));setRecPlan("done");setTimeout(()=>setRecPlan("idle"),2000);};
+    rec.onerror=()=>{clearTimeout(timeout);setRecPlan("error");setTimeout(()=>setRecPlan("idle"),2000);};
     rec.start();
   }
 
@@ -2067,8 +2068,9 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     });
   }
   function startVoice(jIdx,campo,extra,modo){
+    if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
     if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
-      alert("⚠️ Reconocimiento de voz no disponible.");return;
+      alert("⚠️ Reconocimiento de voz no disponible en este dispositivo.");return;
     }
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     const rec=new SR();
@@ -2079,7 +2081,9 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     else if(extra!==undefined&&extra!==null){recKey=campo==="notaLibre"?`libre_${jIdx}_${extra}`:`z${campo.replace("zona_","")}_${jIdx}_${extra}`;}
     else recKey=`${campo==="resumenCoach"?"rc":campo==="notaGeneral"?"ng":campo}_${jIdx}`;
     setRecStatus(recKey);
+    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},10000);
     rec.onresult=e=>{
+      clearTimeout(timeout);
       const txt=e.results[0][0].transcript;
       if(modo==="plan"){
         updPlanZona(jIdx,campo,(clase.jugadores[jIdx].planJuego?.[campo]||"")+(txt?" "+txt:""));
@@ -2093,7 +2097,7 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
       }
       setRecStatus("done");setTimeout(()=>setRecStatus("idle"),2000);
     };
-    rec.onerror=()=>{setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);};
+    rec.onerror=()=>{clearTimeout(timeout);setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);};
     rec.start();
   }
   function finalizar(){
