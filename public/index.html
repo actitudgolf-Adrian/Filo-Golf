@@ -3571,6 +3571,22 @@ function App(){
   });
   const [newRound,setNR]=useState(false);
 
+  // Interceptar flecha atrás del navegador/celular
+  useEffect(()=>{
+    // Agregar una entrada extra al historial para "atrapar" el back
+    window.history.pushState({filo:true},"");
+    function handlePop(e){
+      // Volver a agregar la entrada para que el back siempre sea interceptado
+      window.history.pushState({filo:true},"");
+      if(window.confirm("¿Querés salir de Filo Golf?")){
+        // El usuario confirmó — cerrar sesión o ir a inicio
+        window.history.back();
+      }
+    }
+    window.addEventListener("popstate",handlePop);
+    return()=>window.removeEventListener("popstate",handlePop);
+  },[]);
+
   if(!user)return <Auth onLogin={u=>{lsSet("session",u);setUser(u)}}/>;
 
   const nav=user.isCoach
