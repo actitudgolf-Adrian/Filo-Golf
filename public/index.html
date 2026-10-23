@@ -3564,12 +3564,21 @@ function CoachPanel(){
 function App(){
   const [user,setUser]=useState(()=>lsGet("session"));
   const [tab,setTab]=useState(()=>{
-    // Si hay clase activa y el usuario es coach, arrancar directo en "coach"
     const u=lsGet("session");
-    if(u&&u.isCoach&&lsGet("coach:claseActiva"))return "coach";
+    if(!u)return "stats";
+    // Si hay clase activa y el usuario es coach, arrancar directo en "coach"
+    if(u.isCoach&&lsGet("coach:claseActiva"))return "coach";
+    // Restaurar última pestaña visitada
+    const saved=lsGet("nav:"+u.username);
+    if(saved&&saved.tab)return saved.tab;
     return "stats";
   });
-  const [newRound,setNR]=useState(false);
+  const [newRound,setNR]=useState(()=>{
+    const u=lsGet("session");
+    if(!u)return false;
+    const saved=lsGet("nav:"+u.username);
+    return saved?.newRound||false;
+  });
 
   // Interceptar flecha atrás del navegador/celular
   useEffect(()=>{
@@ -3593,7 +3602,11 @@ function App(){
     ?[["stats","Inicio"],["coach","Coach"],["ronda","+ Vuelta"]]
     :[["stats","Mis Stats"],["myrounds","Mis Vueltas"],["ronda","+ Vuelta"],["canchas","🏌 Canchas"],["profile","Perfil"]];
 
-  function go(t){if(t==="ronda"){setNR(true);return}setNR(false);setTab(t)}
+  function go(t){
+    if(t==="ronda"){setNR(true);if(user)lsSet("nav:"+user.username,{tab,newRound:true});return;}
+    setNR(false);setTab(t);
+    if(user)lsSet("nav:"+user.username,{tab:t,newRound:false});
+  }
 
   return(
     <div style={S.app}>
@@ -3613,7 +3626,7 @@ function App(){
         </div>
       </div>
       {newRound
-        ?<NewRound user={user} onSave={()=>{setNR(false);setTab("myrounds")}} onCancel={()=>setNR(false)}/>
+        ?<NewRound user={user} onSave={()=>{setNR(false);setTab("myrounds");if(user)lsSet("nav:"+user.username,{tab:"myrounds",newRound:false});}} onCancel={()=>{setNR(false);if(user)lsSet("nav:"+user.username,{tab,newRound:false});}}/>
         :tab==="stats"?<Stats user={user}/>
         :tab==="myrounds"?<MyRounds user={user}/>
         :tab==="coach"&&user.isCoach?<CoachPanel/>
