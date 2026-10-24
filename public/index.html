@@ -2069,7 +2069,7 @@ function voiceBtn(status,key,onClick,light){
   );
 }
 
-function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubTab,recStatus,setRecStatus,onUpdate,onFinalizar,onGuardar,lightMode,setLightMode}){
+function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubTab,recStatus,setRecStatus,onUpdate,onFinalizar,onGuardar,lightMode,setLightMode,modoEdicion}){
 
   function updClase(fn){
     const next=JSON.parse(JSON.stringify(clase));fn(next);onUpdate(next);
@@ -2167,7 +2167,7 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
           <button style={{background:L?"#e0d8c8":"#2d2720",color:L?"#5a3a10":"#f5ead0",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"5px 9px",fontSize:"11px",cursor:"pointer"}}
             onClick={()=>setLightMode(!L)}>{L?"🌙 Oscuro":"☀️ Claro"}</button>
           <button style={{background:L?"#e0d8c8":"#2d2720",color:L?"#5a3a10":"#f5ead0",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"5px 9px",fontSize:"11px",cursor:"pointer"}} onClick={guardarBorrador}>💾 Guardar</button>
-          <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"5px 9px",fontSize:"11px",cursor:"pointer",fontWeight:"bold"}} onClick={finalizar}>Finalizar →</button>
+          <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"5px 9px",fontSize:"11px",cursor:"pointer",fontWeight:"bold"}} onClick={finalizar}>{modoEdicion?"✓ Guardar y cerrar":"Finalizar →"}</button>
         </div>
       </div>
 
@@ -2424,7 +2424,7 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
 }
 
 // ─── REPORTE CLASE ────────────────────────────────────────────────────────────
-function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
+function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
   const [selJ,setSelJ]=useState(0);
   const [recStatus,setRecStatus]=useState("idle");
   const [verPlan,setVerPlan]=useState(false);
@@ -2681,7 +2681,8 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
     const blob=new Blob([html],{type:"text/html"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
-    a.href=url;a.download=`FiloGolf_${j.apellido}_${clase.fecha}.html`;
+    const verSuffix=clase.version?`_v${clase.version}`:"";
+    a.href=url;a.download=`FiloGolf_${j.apellido}_${clase.fecha}${verSuffix}.html`;
     document.body.appendChild(a);a.click();
     setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
   }
@@ -2808,7 +2809,7 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
                             <td style={{border:`1px solid ${cardBorder}`,padding:"6px 8px",textAlign:"center",fontWeight:"bold",color:jCol.text,background:L?"#f5f0e8":"#141210"}}>{h}</td>
                             {ZONES.map((_,zi)=>(
                               <td key={zi} style={{border:`1px solid ${cardBorder}`,padding:"4px",verticalAlign:"top",background:L?"#faf7f0":"#1a1812"}}>
-                                {onUpdate?(
+                                {(onUpdate&&!readOnly)?(
                                   <textarea value={nh["zona_"+zi]||""} onChange={e=>updJugador(selJ,jj=>{
                                     if(!jj.notasHoyo)jj.notasHoyo={};
                                     if(!jj.notasHoyo[h])jj.notasHoyo[h]={};
@@ -2820,7 +2821,7 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
                               </td>
                             ))}
                             <td style={{border:`1px solid ${cardBorder}`,padding:"4px",verticalAlign:"top",background:L?"#faf7f0":"#1a1812"}}>
-                              {onUpdate?(
+                              {(onUpdate&&!readOnly)?(
                                 <textarea value={nh.notaLibre||""} onChange={e=>updJugador(selJ,jj=>{
                                   if(!jj.notasHoyo)jj.notasHoyo={};
                                   if(!jj.notasHoyo[h])jj.notasHoyo[h]={};
@@ -2845,25 +2846,25 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
         <div style={{marginBottom:"10px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
             <div style={SC.lbl}>Nota general del jugador</div>
-            {onUpdate&&voiceBtn(recStatus,`ng_${selJ}`,()=>startVoiceR(selJ,"notaGeneral"),L)}
+            {!readOnly&&onUpdate&&voiceBtn(recStatus,`ng_${selJ}`,()=>startVoiceR(selJ,"notaGeneral"),L)}
           </div>
-          <textarea value={j.notaGeneral||""} onChange={e=>updJugador(selJ,jj=>{jj.notaGeneral=e.target.value;})}
+          <textarea value={j.notaGeneral||""} onChange={e=>!readOnly&&updJugador(selJ,jj=>{jj.notaGeneral=e.target.value;})}
             placeholder="Observaciones del jugador..."
-            style={{...SC.inp,minHeight:"64px",resize:"vertical",fontSize:"14px"}}
-            readOnly={!onUpdate}/>
+            style={{...SC.inp,minHeight:"64px",resize:"vertical",fontSize:"14px",opacity:readOnly?0.8:1}}
+            readOnly={readOnly||!onUpdate}/>
         </div>
 
         {/* Resumen coach */}
         <div style={{marginBottom:"14px"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"5px"}}>
             <div style={{...SC.lbl,color:jCol.text}}>Resumen Coach</div>
-            {onUpdate&&voiceBtn(recStatus,`rc_${selJ}`,()=>startVoiceR(selJ,"resumenCoach"),L)}
+            {!readOnly&&onUpdate&&voiceBtn(recStatus,`rc_${selJ}`,()=>startVoiceR(selJ,"resumenCoach"),L)}
           </div>
-          <textarea value={j.resumenCoach||""} onChange={e=>updJugador(selJ,jj=>{jj.resumenCoach=e.target.value;})}
+          <textarea value={j.resumenCoach||""} onChange={e=>!readOnly&&updJugador(selJ,jj=>{jj.resumenCoach=e.target.value;})}
             placeholder="Resumen del coach para este jugador..."
             style={{...SC.inp,minHeight:"72px",resize:"vertical",fontSize:"14px",
-              background:L?"#e8f0e0":"#182010",border:`2px solid ${jCol.border}`}}
-            readOnly={!onUpdate}/>
+              background:L?"#e8f0e0":"#182010",border:`2px solid ${jCol.border}`,opacity:readOnly?0.8:1}}
+            readOnly={readOnly||!onUpdate}/>
         </div>
 
         <div style={{display:"flex",gap:"8px"}}>
@@ -3099,6 +3100,7 @@ function ClaseEnCancha(){
   const [selClase,setSelClase]=useState(null);
   const [selAlumno,setSelAlumno]=useState(null);
   const [claseView,setClaseView]=useState("historial"); // "historial"|"stats"
+  const [claseEditando,setClaseEditando]=useState(null); // clase copia que se está editando
   // Estado de navegación de clase activa — a nivel padre para no resetearse al re-render
   const [selJ,setSelJ]=useState(0);
   const [selH,setSelH]=useState(1);
@@ -3267,10 +3269,92 @@ function ClaseEnCancha(){
       saveClases(arr,next);setCurPersist(next);setCur(next);
     }} lightMode={lightMode} setLightMode={toggleLight}/>;
   }
-  if(selClase)return <ReporteClase clase={selClase} onBack={()=>setSelClase(null)} onUpdate={next=>{
+  if(claseEditando)return(
+    <div>
+      <div style={{background:"#1a1612",padding:"10px 14px",borderBottom:"2px solid #C9A84C",display:"flex",alignItems:"center",gap:"10px",flexWrap:"wrap"}}>
+        <span style={{color:"#C9A84C",fontWeight:"bold",fontSize:"13px"}}>✏️ Editando copia V{claseEditando.version}</span>
+        <span style={{color:"#b09050",fontSize:"11px"}}>El original no se modifica</span>
+        <button onClick={cerrarEdicion} style={{marginLeft:"auto",background:"none",border:"1px solid #5a4a20",borderRadius:"4px",color:"#b09050",cursor:"pointer",fontSize:"11px",padding:"4px 10px"}}>← Volver al historial</button>
+      </div>
+      <ClaseActivaPanel
+        clase={claseEditando}
+        clases={clases}
+        selJ={selJ} setSelJ={setSelJ}
+        selH={selH} setSelH={setSelH}
+        subTab={subTab} setSubTab={setSubTab}
+        recStatus={recStatus} setRecStatus={setRecStatus}
+        onUpdate={next=>{guardarCopiaEditada(next);}}
+        onFinalizar={next=>{guardarCopiaEditada(next);cerrarEdicion();}}
+        onGuardar={(next,arr)=>{guardarCopiaEditada(next);}}
+        lightMode={lightMode} setLightMode={toggleLight}
+        modoEdicion={true}
+      />
+    </div>
+  );
+
+  if(selClase){
+    // Buscar todas las versiones de esta clase (original + copias)
+    const parentId=selClase.parentId||selClase.id;
+    const todasVersiones=[clases.find(c=>c.id===parentId),...clases.filter(c=>c.parentId===parentId&&c.version)].filter(Boolean).sort((a,b)=>(a.version||0)-(b.version||0));
+    return(
+      <div>
+        {todasVersiones.length>1&&(
+          <div style={{background:"#1a1612",padding:"10px 14px",borderBottom:"1px solid #5a4a20",display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap"}}>
+            <span style={{color:"#b09050",fontSize:"11px",marginRight:"4px"}}>Versiones:</span>
+            {todasVersiones.map((v,i)=>{
+              const lbl=v.version?`V${v.version}`:"Original";
+              const ts=v.createdAt?new Date(v.createdAt).toLocaleString("es-AR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"";
+              const activa=selClase.id===v.id;
+              return(
+                <button key={v.id} onClick={()=>setSelClase(v)} style={{
+                  background:activa?"#C9A84C":"#2a2318",color:activa?"#1a1612":"#b09050",
+                  border:`1px solid ${activa?"#C9A84C":"#5a4a20"}`,borderRadius:"4px",
+                  padding:"4px 10px",fontSize:"11px",cursor:"pointer"
+                }}>{lbl}{ts?` · ${ts}`:""}</button>
+              );
+            })}
+          </div>
+        )}
+        <ReporteClase clase={selClase} onBack={()=>setSelClase(null)} onUpdate={next=>{
+          const arr=[...clases.filter(c=>c.id!==next.id),next];
+          saveClases(arr,next);setSelClase(next);
+        }} lightMode={lightMode} setLightMode={toggleLight} readOnly={true}/>
+      </div>
+    );
+  }
+
+  async function crearCopiaEditable(claseOriginal){
+    // Buscar cuántas versiones ya existen de este original
+    const parentId=claseOriginal.parentId||claseOriginal.id;
+    const versiones=clases.filter(c=>c.parentId===parentId||c.id===parentId);
+    const nextVersion=versiones.filter(c=>c.version).length+1;
+    if(!window.confirm(`Se va a crear una copia editable (V${nextVersion}). El original queda guardado sin cambios. ¿Continuar?`))return;
+    const copia={
+      ...JSON.parse(JSON.stringify(claseOriginal)),
+      id:"clase_"+Date.now(),
+      parentId,
+      version:nextVersion,
+      createdAt:Date.now(),
+      finalizada:true,
+    };
+    const arr=[...clases,copia];
+    setClases(arr);
+    lsSet(CLASE_LS,arr);
+    const ok=await sbUpsertClase(copia);
+    if(!ok)setSyncStatus("err");
+    // Abrir para editar
+    setClaseEditando(copia);
+  }
+
+  function guardarCopiaEditada(next){
     const arr=[...clases.filter(c=>c.id!==next.id),next];
-    saveClases(arr,next);setSelClase(next);
-  }} lightMode={lightMode} setLightMode={toggleLight}/>;
+    saveClases(arr,next);
+    setClaseEditando(next);
+  }
+
+  function cerrarEdicion(){
+    setClaseEditando(null);
+  }
 
   function eliminarClase(id){
     if(!window.confirm("¿Archivar esta clase? Va a desaparecer del listado pero todos los datos se conservan."))return;
@@ -3343,9 +3427,11 @@ function ClaseEnCancha(){
                       <div style={{color:"#f5ead0",fontSize:"12px"}}>{cl.fecha} · {cl.courseName}{cl.configName?` · ${cl.configName}`:""}</div>
                       <div style={{color:"#b09050",fontSize:"10px"}}>{cl.numHoles} hoyos · {cl.jugadores.length} jugador{cl.jugadores.length!==1?"es":""}</div>
                     </div>
-                    <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"8px",flexWrap:"wrap",justifyContent:"flex-end"}}>
                       {total>0&&<div style={{color:gold,fontSize:"16px",fontWeight:"bold",cursor:"pointer"}} onClick={()=>setSelClase(cl)}>{total}</div>}
+                      {cl.version&&<span style={{fontSize:"9px",color:"#C9A84C",border:"1px solid #C9A84C",borderRadius:"3px",padding:"1px 5px"}}>V{cl.version}</span>}
                       <div style={{color:"#b09050",fontSize:"10px",cursor:"pointer"}} onClick={()=>setSelClase(cl)}>Ver →</div>
+                      <button onClick={()=>crearCopiaEditable(cl)} style={{background:"none",border:"1px solid #4a7a30",borderRadius:"4px",color:"#7ab050",cursor:"pointer",fontSize:"10px",padding:"3px 7px"}}>✏️ Modificar</button>
                       <button onClick={()=>eliminarClase(cl.id)} style={{background:"none",border:"1px solid #5a4a20",borderRadius:"4px",color:"#b09050",cursor:"pointer",fontSize:"10px",padding:"3px 7px"}}>Archivar</button>
                     </div>
                   </div>
