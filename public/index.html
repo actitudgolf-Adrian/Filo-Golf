@@ -2485,6 +2485,37 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
     rec.start();
   }
 
+  function calcStatsClase(jIdx){
+    const holes=Object.values(clase.jugadores[jIdx].holes||{});
+    const n=holes.filter(h=>parseInt(h.shots)>0).length;
+    if(!n)return null;
+    const totalPutts=holes.reduce((s,h)=>s+(parseInt(h.putts)||0),0);
+    const totalChips=holes.reduce((s,h)=>s+(parseInt(h.chips)||0),0);
+    const totalBunker=holes.reduce((s,h)=>s+(parseInt(h.bunker)||0),0);
+    const avgPuttsH=n?(totalPutts/n).toFixed(2):"—";
+    const avgChipsH=n?(totalChips/n).toFixed(2):"—";
+    const avgBunkerH=n?(totalBunker/n).toFixed(2):"—";
+    const dp1vals=holes.map(h=>parseFloat(h.distPutt1)).filter(v=>v>0);
+    const avgDistPutt1=dp1vals.length?(dp1vals.reduce((a,b)=>a+b,0)/dp1vals.length).toFixed(1):"—";
+    const sumDistPutt1=dp1vals.length?dp1vals.reduce((a,b)=>a+b,0).toFixed(1):"—";
+    const tirosGreenAll=holes.flatMap(h=>Array.isArray(h.tirosGreen)?h.tirosGreen:[]);
+    const tirosConDist=tirosGreenAll.filter(t=>parseFloat(t.dist)>0);
+    const avgDistGreen=tirosConDist.length?(tirosConDist.reduce((s,t)=>s+parseFloat(t.dist),0)/tirosConDist.length).toFixed(1):"—";
+    const tirosConRes=tirosGreenAll.filter(t=>t.resultado==="si"||t.resultado==="no");
+    const greenSi=tirosConRes.filter(t=>t.resultado==="si").length;
+    const pctGreen=tirosConRes.length?(greenSi/tirosConRes.length*100).toFixed(0)+"% ("+greenSi+"/"+tirosConRes.length+")"  :"—";
+    const porPar={};
+    [3,4,5].forEach(p=>{
+      const ph=holes.filter(h=>parseInt(h.par)===p&&parseInt(h.shots)>0);
+      if(ph.length){
+        const avgDiff=(ph.reduce((s,h)=>s+(parseInt(h.shots)-p),0)/ph.length);
+        const sign=avgDiff>0?"+":"";
+        porPar[p]={n:ph.length,avgDiff:sign+avgDiff.toFixed(2)};
+      }
+    });
+    return{n,totalPutts,totalChips,totalBunker,avgPuttsH,avgChipsH,avgBunkerH,avgDistPutt1,sumDistPutt1,dp1count:dp1vals.length,avgDistGreen,pctGreen,tirosTotal:tirosGreenAll.length,porPar};
+  }
+
   function generarPDF(jIdx){
     const j=clase.jugadores[jIdx];
     const total=calcTotal(jIdx);
@@ -2493,6 +2524,7 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode}){
     const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
     const neto=total?total-hcpProp:null;
     const plan=j.planJuego||{};
+    const st=calcStatsClase(jIdx);
 
     const hoyoRows=Array.from({length:clase.numHoles},(_,i)=>{
       const h=j.holes[i+1]||{};
@@ -2588,6 +2620,49 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
   ${anotacionesHoyo?`<h3>Anotaciones por Hoyo</h3><div class="nota-texto">${anotacionesHoyo}</div>`:""}
   ${j.notaGeneral?`<h3>Observaciones del Jugador</h3><div class="nota-texto">${j.notaGeneral}</div>`:""}
   ${j.resumenCoach?`<h3>Resumen del Coach</h3><div class="nota-coach">${j.resumenCoach}</div>`:""}
+  ${st?`<h3>Estadísticas de la Clase</h3>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center;margin-bottom:14px">
+      <div style="background:#f0ebe0;border-radius:6px;padding:10px 4px">
+        <div style="font-size:10px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Putts totales</div>
+        <div style="font-size:24px;font-weight:bold;color:#1a1612">${st.totalPutts||"—"}</div>
+        <div style="font-size:10px;color:#888">${st.avgPuttsH} por hoyo</div>
+      </div>
+      <div style="background:#f0ebe0;border-radius:6px;padding:10px 4px">
+        <div style="font-size:10px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Chips totales</div>
+        <div style="font-size:24px;font-weight:bold;color:#1a1612">${st.totalChips||"0"}</div>
+        <div style="font-size:10px;color:#888">${st.avgChipsH} por hoyo</div>
+      </div>
+      <div style="background:#f0ebe0;border-radius:6px;padding:10px 4px">
+        <div style="font-size:10px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Búnker totales</div>
+        <div style="font-size:24px;font-weight:bold;color:#1a1612">${st.totalBunker||"0"}</div>
+        <div style="font-size:10px;color:#888">${st.avgBunkerH} por hoyo</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+      <thead><tr>
+        <th style="background:#1a1612;color:#C9A84C;padding:6px 8px;text-align:left;border:1px solid #ddd">Métrica</th>
+        <th style="background:#1a1612;color:#C9A84C;padding:6px 8px;text-align:center;border:1px solid #ddd">Valor</th>
+      </tr></thead>
+      <tbody>
+        ${st.dp1count>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Dist. promedio 1er putt</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.avgDistPutt1} yds</td></tr>`:""}
+        ${st.dp1count>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Dist. total pateada (suma)</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.sumDistPutt1} yds (${st.dp1count} hoyos)</td></tr>`:""}
+        ${st.tirosTotal>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Tiros al green — Dist. promedio</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.avgDistGreen} yds</td></tr>`:""}
+        ${st.tirosTotal>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Greens alcanzados (GIR)</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.pctGreen}</td></tr>`:""}
+      </tbody>
+    </table>
+    ${Object.keys(st.porPar).length?`
+    <div style="margin-top:8px">
+      <div style="font-size:11px;color:#6a4a1a;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Promedio relativo al par</div>
+      <div style="display:flex;gap:8px">
+        ${[3,4,5].map(p=>st.porPar[p]?`<div style="flex:1;background:#f0ebe0;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:10px;color:#b09050;text-transform:uppercase">Par ${p}</div>
+          <div style="font-size:18px;font-weight:bold;color:${parseFloat(st.porPar[p].avgDiff)<=0?"#3a8a30":"#c04040"}">${st.porPar[p].avgDiff}</div>
+          <div style="font-size:10px;color:#888">${st.porPar[p].n} hoyos</div>
+        </div>`:"").join("")}
+      </div>
+    </div>`:""}
+  </div>`:""}
   <div class="jugador-box">
     <h4>Espacio para el Jugador</h4>
     <p style="font-size:12px;color:#888;margin-bottom:8px">¿Algo que el coach no haya visto? Podés agregar tus propias observaciones aquí.</p>
