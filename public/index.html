@@ -2663,10 +2663,8 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
       +'<div style="background:#1a1612;color:#C9A84C;padding:10px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:bold;letter-spacing:1px">&#127953; TU REFLEXIÓN &#8212; ¿Pudiste cumplir tu plan mental?</div>'
       +'<div class="card" style="border-radius:0 0 6px 6px;margin-bottom:16px;border-top:none">'
       +'<p style="font-size:12px;color:#6a4a1a;margin-bottom:12px;line-height:1.5">Según tu plan de Hoyo 0, ¿lo pudiste cumplir? ¿Cuándo sí, cuándo no, en qué hoyos? Registralo para vos.</p>'
-      +'<div id="micStatus" style="display:none;font-size:11px;color:#c04040;margin-bottom:6px">&#128308; Grabando... (hablá con calma)</div>'
       +'<textarea id="reflexionJugador" placeholder="Escribí tu reflexión aquí..." style="width:100%;min-height:100px;border:2px solid #C9A84C;border-radius:6px;padding:10px;font-family:Georgia,serif;font-size:13px;color:#1a1612;background:#fffdf8;resize:none;overflow:hidden;box-sizing:border-box" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'"></textarea>'
       +'<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">'
-      +'<button id="btnMic" onclick="toggleMic()" style="background:#1a1612;color:#C9A84C;border:2px solid #C9A84C;border-radius:6px;padding:8px 16px;font-size:12px;cursor:pointer;font-family:Georgia,serif">&#127897; Dictado por voz</button>'
       +'<button onclick="descargarConRespuesta()" style="background:linear-gradient(135deg,#C9A84C,#a8822a);color:#1a1612;border:none;border-radius:6px;padding:8px 16px;font-size:12px;cursor:pointer;font-weight:bold;font-family:Georgia,serif">&#8595; Guardar mi reflexión</button>'
       +'<span style="font-size:10px;color:#9a7030">El archivo se guarda en tu dispositivo</span>'
       +'</div></div>'
@@ -2765,21 +2763,6 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 </div>
 <div class="footer"><span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span></div>
 <script>
-var rec=null;var recActive=false;
-function toggleMic(){
-  if(recActive){if(rec)rec.stop();return;}
-  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert('Reconocimiento de voz no disponible en este dispositivo.');return;}
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  rec=new SR();rec.lang='es-AR';rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=true;
-  rec.onstart=function(){recActive=true;document.getElementById('micStatus').style.display='block';document.getElementById('btnMic').textContent='⏹ Detener';document.getElementById('btnMic').style.background='#3a1010';document.getElementById('btnMic').style.color='#e06060';document.getElementById('btnMic').style.borderColor='#c04040';};
-  rec.onend=function(){recActive=false;document.getElementById('micStatus').style.display='none';document.getElementById('btnMic').textContent='🎙 Dictado por voz';document.getElementById('btnMic').style.background='#1a1612';document.getElementById('btnMic').style.color='#C9A84C';document.getElementById('btnMic').style.borderColor='#C9A84C';};
-  rec.onerror=function(){recActive=false;document.getElementById('micStatus').style.display='none';};
-  rec.onresult=function(e){
-    var txt='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)txt+=e.results[i][0].transcript+' ';}
-    if(txt){var ta=document.getElementById('reflexionJugador');ta.value+=(ta.value?'':'')+txt;ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';}
-  };
-  rec.start();
-}
 function descargarConRespuesta(){
   var reflexion=document.getElementById('reflexionJugador').value;
   var html=document.documentElement.outerHTML;
