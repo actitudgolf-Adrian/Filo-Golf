@@ -2427,10 +2427,17 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
 function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
   const [selJ,setSelJ]=useState(0);
   const [recStatus,setRecStatus]=useState("idle");
+  const [recDevStatus,setRecDevStatus]=useState("idle");
   const [verPlan,setVerPlan]=useState(false);
   const [verAnotaciones,setVerAnotaciones]=useState(true);
   const [previewHtml,setPreviewHtml]=useState(null);
   const [verTarjeta,setVerTarjeta]=useState(false);
+  // devolucionPlan[jIdx] = { zona_0..4, estrategiaGlobal, reflexionFinal }
+  const [devolucionPlan,setDevolucionPlan]=useState(()=>{
+    const d={};
+    clase.jugadores.forEach((j,i)=>{d[i]=j.devolucionPlan||{};});
+    return d;
+  });
 
   const L=lightMode||false;
   const bg=L?"#f5f0e8":"#0f0d0a";
@@ -2467,6 +2474,36 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
     const next=JSON.parse(JSON.stringify(clase));
     fn(next.jugadores[jIdx]);
     onUpdate(next);
+  }
+  function updDevolucion(jIdx,campo,val){
+    setDevolucionPlan(prev=>{
+      const next={...prev,[jIdx]:{...prev[jIdx],[campo]:val}};
+      // persistir en la clase
+      if(onUpdate){
+        const nc=JSON.parse(JSON.stringify(clase));
+        nc.jugadores[jIdx].devolucionPlan=next[jIdx];
+        onUpdate(nc);
+      }
+      return next;
+    });
+  }
+  function startVoiceDev(jIdx,campo){
+    if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
+    if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert("⚠️ Reconocimiento de voz no disponible.");return;}
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const rec=new SR();
+    rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
+    rec.onstart=()=>setRecDevStatus("rec_"+jIdx+"_"+campo);
+    rec.onend=()=>setRecDevStatus("idle");
+    rec.onerror=()=>setRecDevStatus("idle");
+    rec.onresult=e=>{
+      const txt=e.results[0]?.[0]?.transcript||"";
+      if(txt){
+        const prev=devolucionPlan[jIdx]?.[campo]||"";
+        updDevolucion(jIdx,campo,(prev?prev+" ":"")+txt);
+      }
+    };
+    rec.start();
   }
   function startVoiceR(jIdx,campo){
     if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
@@ -2534,6 +2571,7 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
     const hcpProp=Math.ceil((j.hcp||0)*clase.numHoles/18);
     const neto=total?total-hcpProp:null;
     const plan=j.planJuego||{};
+    const dev=devolucionPlan[jIdx]||{};
     const st=calcStatsClase(jIdx);
 
     const hoyoRows=Array.from({length:clase.numHoles},(_,i)=>{
@@ -2582,9 +2620,57 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
     `:"";
     const anotacionesHoyo=hoyosConAnotaciones.length?anotacionesTablaHTML:"";
 
-    // Plan de juego
-    const planHTML=ZONES.map((z,zi)=>plan["zona_plan_"+zi]?`<div style="margin-bottom:10px"><strong style="color:#7a5010">${z}:</strong><div style="padding:8px 12px;background:#f9f6f0;border-left:3px solid #C9A84C;margin-top:4px;font-size:12px">${plan["zona_plan_"+zi]}</div></div>`:"").join("")
-      +(plan.estrategiaGlobal?`<div style="margin-bottom:10px"><strong style="color:#6a4a1a">Estrategia Global:</strong><div style="padding:8px 12px;background:#f9f6f0;border-left:3px solid #C9A84C;margin-top:4px;font-size:12px">${plan.estrategiaGlobal}</div></div>`:"");
+    // Plan Hoyo 0 + devoluciones del coach
+    const hayPlan=ZONES.some((_,zi)=>plan["zona_plan_"+zi])||plan.estrategiaGlobal;
+    const hayDev=ZONES.some((_,zi)=>dev["zona_"+zi])||dev.estrategiaGlobal||dev.reflexionFinal;
+    const planZonasHTML=ZONES.map((z,zi)=>{
+      const p=plan["zona_plan_"+zi]||"";
+      const d=dev["zona_"+zi]||"";
+      const dBlock=d?('<div style="font-size:10px;color:#3a7010;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Devoluci\xF3n del coach</div>'
+        +'<div style="background:#f0f6e8;border-left:3px solid #5a9a20;padding:8px 10px;font-size:12px;color:#1a3a08">'+d+'</div>'):"";
+      return '<div style="border:1px solid #e8dcc8;border-radius:6px;margin-bottom:10px;overflow:hidden">'
+        +'<div style="background:#2a1e0a;color:#C9A84C;padding:7px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1px">&#128205; '+z+'</div>'
+        +'<div style="padding:10px 12px">'
+        +'<div style="font-size:10px;color:#9a7030;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Plan del jugador</div>'
+        +'<div style="background:#f9f6f0;border-left:3px solid #C9A84C;padding:8px 10px;font-size:12px;color:#333;font-style:italic;margin-bottom:'+(d?"8px":"0")+'">'+( p||"<em style='color:#bbb'>No informada antes de salir</em>")+'</div>'
+        +dBlock
+        +'</div></div>';
+    }).join("");
+    const estrategiaHTML=(()=>{
+      const p=plan.estrategiaGlobal||"";
+      const d=dev.estrategiaGlobal||"";
+      const dBlock=d?('<div style="font-size:10px;color:#3a7010;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Devoluci\xF3n del coach</div>'
+        +'<div style="background:#f0f6e8;border-left:3px solid #5a9a20;padding:8px 10px;font-size:12px;color:#1a3a08">'+d+'</div>'):"";
+      return '<div style="border:1px solid #e8dcc8;border-radius:6px;margin-bottom:10px;overflow:hidden">'
+        +'<div style="background:#2a1e0a;color:#C9A84C;padding:7px 12px;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:1px">&#127760; Estrategia Global</div>'
+        +'<div style="padding:10px 12px">'
+        +'<div style="font-size:10px;color:#9a7030;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Plan del jugador</div>'
+        +'<div style="background:#f9f6f0;border-left:3px solid #C9A84C;padding:8px 10px;font-size:12px;color:#333;font-style:italic;margin-bottom:'+(d?"8px":"0")+'">'+( p||"<em style='color:#bbb'>No informada antes de salir</em>")+'</div>'
+        +dBlock
+        +'</div></div>';
+    })();
+    const reflexionFinalHTML=dev.reflexionFinal
+      ?('<div style="background:#f5f0e0;border:2px solid #C9A84C;border-radius:6px;padding:12px;margin-top:10px">'
+        +'<div style="font-size:10px;color:#7a5010;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:bold">&#9997;&#65039; Reflexi\xF3n Final del Coach</div>'
+        +'<div style="font-size:13px;color:#2a1a08;line-height:1.6">'+dev.reflexionFinal+'</div>'
+        +'</div>')
+      :"";
+    const planHTML=(hayPlan||hayDev)?planZonasHTML+estrategiaHTML+reflexionFinalHTML:"";
+
+    const hoyo0Block=planHTML?(
+      '<div style="background:#1a1612;color:#C9A84C;padding:10px 14px;border-radius:6px 6px 0 0;margin-bottom:0;font-size:13px;font-weight:bold;letter-spacing:1px">&#129504; HOYO 0 &#8212; PLAN MENTAL Y DEVOLUCIÓN</div>'
+      +'<div class="card" style="border-radius:0 0 6px 6px;margin-bottom:16px;border-top:none">'+planHTML+'</div>'
+      +'<div style="background:#1a1612;color:#C9A84C;padding:10px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:bold;letter-spacing:1px">&#127953; TU REFLEXIÓN &#8212; ¿Pudiste cumplir tu plan mental?</div>'
+      +'<div class="card" style="border-radius:0 0 6px 6px;margin-bottom:16px;border-top:none">'
+      +'<p style="font-size:12px;color:#6a4a1a;margin-bottom:12px;line-height:1.5">Según tu plan de Hoyo 0, ¿lo pudiste cumplir? ¿Cuándo sí, cuándo no, en qué hoyos? Registralo para vos.</p>'
+      +'<div id="micStatus" style="display:none;font-size:11px;color:#c04040;margin-bottom:6px">&#128308; Grabando... (hablá con calma)</div>'
+      +'<textarea id="reflexionJugador" placeholder="Escribí tu reflexión aquí..." style="width:100%;min-height:100px;border:2px solid #C9A84C;border-radius:6px;padding:10px;font-family:Georgia,serif;font-size:13px;color:#1a1612;background:#fffdf8;resize:none;overflow:hidden;box-sizing:border-box" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\'"></textarea>'
+      +'<div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">'
+      +'<button id="btnMic" onclick="toggleMic()" style="background:#1a1612;color:#C9A84C;border:2px solid #C9A84C;border-radius:6px;padding:8px 16px;font-size:12px;cursor:pointer;font-family:Georgia,serif">&#127897; Dictado por voz</button>'
+      +'<button onclick="descargarConRespuesta()" style="background:linear-gradient(135deg,#C9A84C,#a8822a);color:#1a1612;border:none;border-radius:6px;padding:8px 16px;font-size:12px;cursor:pointer;font-weight:bold;font-family:Georgia,serif">&#8595; Guardar mi reflexión</button>'
+      +'<span style="font-size:10px;color:#9a7030">El archivo se guarda en tu dispositivo</span>'
+      +'</div></div>'
+    ):"";
 
     const html=`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
 <title>Informe Filo Golf · ${j.nombre} ${j.apellido}</title>
@@ -2616,13 +2702,15 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
 </div>
 <div class="body">
   <h2>Informe de Clase en Cancha</h2>
+
+  ${hoyo0Block}
+
   <div class="card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${total||"—"}</div></div>
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Neto (HCP ${hcpProp})</div><div style="font-size:26px;font-weight:bold;color:#6a4a1a">${neto??("—")}</div></div>
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Putts</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${putts||"—"}</div></div>
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Penalidades</div><div style="font-size:26px;font-weight:bold;color:${pen>0?"#c04040":"#1a1612"}">${pen||"0"}</div></div>
   </div>
-  ${planHTML?`<h3>Plan de Juego (Hoyo 0)</h3><div class="card">${planHTML}</div>`:""}
   <h3>Tarjeta de Puntaje</h3>
   <table><thead><tr>
     <th>Hoyo</th><th>Par</th><th>Golpes</th><th>Putts</th><th>Chips</th><th>Bunker</th><th>Penal.</th><th>Dist. Green</th><th>Nota</th>
@@ -2674,13 +2762,40 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
       </div>
     </div>`:""}
   </div>`:""}
-  <div class="jugador-box">
-    <h4>Espacio para el Jugador</h4>
-    <p style="font-size:12px;color:#888;margin-bottom:8px">¿Algo que el coach no haya visto? Podés agregar tus propias observaciones aquí.</p>
-    <div style="height:80px;border:1px solid #e8dcc8;border-radius:4px"></div>
-  </div>
 </div>
 <div class="footer"><span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span></div>
+<script>
+var rec=null;var recActive=false;
+function toggleMic(){
+  if(recActive){if(rec)rec.stop();return;}
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){alert('Reconocimiento de voz no disponible en este dispositivo.');return;}
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  rec=new SR();rec.lang='es-AR';rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=true;
+  rec.onstart=function(){recActive=true;document.getElementById('micStatus').style.display='block';document.getElementById('btnMic').textContent='⏹ Detener';document.getElementById('btnMic').style.background='#3a1010';document.getElementById('btnMic').style.color='#e06060';document.getElementById('btnMic').style.borderColor='#c04040';};
+  rec.onend=function(){recActive=false;document.getElementById('micStatus').style.display='none';document.getElementById('btnMic').textContent='🎙 Dictado por voz';document.getElementById('btnMic').style.background='#1a1612';document.getElementById('btnMic').style.color='#C9A84C';document.getElementById('btnMic').style.borderColor='#C9A84C';};
+  rec.onerror=function(){recActive=false;document.getElementById('micStatus').style.display='none';};
+  rec.onresult=function(e){
+    var txt='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)txt+=e.results[i][0].transcript+' ';}
+    if(txt){var ta=document.getElementById('reflexionJugador');ta.value+=(ta.value?'':'')+txt;ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';}
+  };
+  rec.start();
+}
+function descargarConRespuesta(){
+  var reflexion=document.getElementById('reflexionJugador').value;
+  var html=document.documentElement.outerHTML;
+  // Embeber la reflexión como texto fijo en el HTML descargado
+  var timestamp=new Date().toLocaleString('es-AR');
+  var bloque='<div style="background:#fffdf8;border:2px solid #C9A84C;border-radius:6px;padding:14px;margin-bottom:16px"><div style="font-size:10px;color:#9a7030;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:bold">🏌️ Mi reflexión — '+timestamp+'</div><div style="font-size:13px;color:#1a1612;line-height:1.6;white-space:pre-wrap">'+reflexion.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div></div>';
+  // Reemplazar el bloque interactivo con el bloque fijo
+  html=html.replace(/<div style="background:#1a1612;color:#C9A84C;padding:10px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:bold;letter-spacing:1px">🏌️ TU REFLEXIÓN[\s\S]*?<\/div>\s*<\/div>/,bloque);
+  var blob=new Blob([html],{type:'text/html'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;
+  a.download='MiReflexion_FiloGolf_'+Date.now()+'.html';
+  document.body.appendChild(a);a.click();
+  setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},1000);
+}
+<\/script>
 </body></html>`;
 
     return html;
@@ -2758,31 +2873,118 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
           ))}
         </div>
 
-        {/* Plan de juego (toggle) */}
-        {(j.planJuego&&Object.values(j.planJuego).some(Boolean))&&(
-          <div style={{marginBottom:"12px"}}>
-            <button onClick={()=>setVerPlan(!verPlan)} style={{
-              background:L?"#e8e0d0":"#2a2318",color:jCol.text,border:`1px solid ${jCol.border}`,
-              borderRadius:"4px",padding:"6px 12px",fontSize:"12px",cursor:"pointer",width:"100%",textAlign:"left"
-            }}>{verPlan?"▲":"▶"} Plan de Juego · Hoyo 0</button>
-            {verPlan&&(
-              <div style={{marginTop:"8px"}}>
-                {ZONES.map((zona,zi)=>j.planJuego["zona_plan_"+zi]&&(
-                  <div key={zona} style={{marginBottom:"8px"}}>
-                    <div style={{color:jCol.text,fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"3px"}}>{zona}</div>
-                    <div style={{background:L?"#f0e8d8":"#141210",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"8px",fontSize:"13px",color:txt}}>{j.planJuego["zona_plan_"+zi]}</div>
+        {/* Plan Hoyo 0 + Devolución del Coach */}
+        <div style={{marginBottom:"12px"}}>
+          <button onClick={()=>setVerPlan(!verPlan)} style={{
+            background:L?"#e8e0d0":"#2a2318",color:jCol.text,border:`1px solid ${jCol.border}`,
+            borderRadius:"4px",padding:"6px 12px",fontSize:"12px",cursor:"pointer",width:"100%",textAlign:"left",fontWeight:"bold"
+          }}>{verPlan?"▲":"▶"} 🧠 Hoyo 0 — Plan Mental y Devolución</button>
+          {verPlan&&(
+            <div style={{marginTop:"8px",border:`1px solid ${jCol.border}`,borderRadius:"6px",overflow:"hidden"}}>
+              {/* cada zona */}
+              {ZONES.map((zona,zi)=>{
+                const planTxt=j.planJuego?.["zona_plan_"+zi];
+                const devKey="zona_"+zi;
+                const devTxt=devolucionPlan[selJ]?.[devKey]||"";
+                const recKey="dev_"+selJ+"_"+devKey;
+                const isRec=recDevStatus==="rec_"+selJ+"_"+devKey;
+                return(
+                  <div key={zona} style={{borderBottom:`1px solid ${cardBorder}`,padding:"10px 12px"}}>
+                    <div style={{color:jCol.text,fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",fontWeight:"bold",marginBottom:"6px"}}>📍 {zona}</div>
+                    {/* Plan del jugador */}
+                    <div style={{background:L?"#f5f0e8":"#0f0d0a",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"8px",fontSize:"13px",color:txt,marginBottom:"8px",fontStyle:"italic"}}>
+                      {planTxt||<span style={{color:txtMuted,fontStyle:"normal",fontSize:"11px"}}>⚠ No informada antes de salir</span>}
+                    </div>
+                    {/* Devolución del coach */}
+                    {!readOnly&&onUpdate&&(
+                      <div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+                          <div style={{fontSize:"10px",color:txtMuted,letterSpacing:"0.5px",textTransform:"uppercase"}}>Devolución del coach</div>
+                          <button onClick={()=>isRec?null:startVoiceDev(selJ,devKey)}
+                            style={{background:isRec?(L?"#ffdddd":"#3a1010"):"none",border:`1px solid ${isRec?"#c04040":jCol.border}`,borderRadius:"4px",color:isRec?"#e06060":jCol.text,cursor:"pointer",fontSize:"11px",padding:"2px 8px"}}>
+                            {isRec?"🔴 Grabando...":"🎙"}
+                          </button>
+                        </div>
+                        <textarea
+                          value={devTxt}
+                          onChange={e=>updDevolucion(selJ,devKey,e.target.value)}
+                          placeholder={`Devolución sobre ${zona.toLowerCase()}...`}
+                          style={{...SC.inp,minHeight:"52px",resize:"none",overflow:"hidden",fontSize:"13px"}}
+                          onInput={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";}}
+                        />
+                      </div>
+                    )}
+                    {readOnly&&devTxt&&(
+                      <div style={{background:L?"#f0f6e8":"#102010",border:`1px solid #4a7a20`,borderRadius:"4px",padding:"8px",fontSize:"12px",color:L?"#2a5010":"#8abf60"}}>
+                        <strong style={{fontSize:"10px",color:L?"#3a6010":"#6a9a40",textTransform:"uppercase",letterSpacing:"0.5px"}}>Coach: </strong>{devTxt}
+                      </div>
+                    )}
                   </div>
-                ))}
-                {j.planJuego.estrategiaGlobal&&(
-                  <div style={{marginBottom:"8px"}}>
-                    <div style={{color:gold,fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",marginBottom:"3px"}}>Estrategia Global</div>
-                    <div style={{background:L?"#f0e8d8":"#141210",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"8px",fontSize:"13px",color:txt}}>{j.planJuego.estrategiaGlobal}</div>
+                );
+              })}
+              {/* Estrategia global */}
+              {(()=>{
+                const planTxt=j.planJuego?.estrategiaGlobal;
+                const devTxt=devolucionPlan[selJ]?.estrategiaGlobal||"";
+                const isRec=recDevStatus==="rec_"+selJ+"_estrategiaGlobal";
+                return(
+                  <div style={{borderBottom:`1px solid ${cardBorder}`,padding:"10px 12px"}}>
+                    <div style={{color:gold,fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",fontWeight:"bold",marginBottom:"6px"}}>🌐 Estrategia Global</div>
+                    <div style={{background:L?"#f5f0e8":"#0f0d0a",border:`1px solid ${cardBorder}`,borderRadius:"4px",padding:"8px",fontSize:"13px",color:txt,marginBottom:"8px",fontStyle:"italic"}}>
+                      {planTxt||<span style={{color:txtMuted,fontStyle:"normal",fontSize:"11px"}}>⚠ No informada antes de salir</span>}
+                    </div>
+                    {!readOnly&&onUpdate&&(
+                      <div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+                          <div style={{fontSize:"10px",color:txtMuted,letterSpacing:"0.5px",textTransform:"uppercase"}}>Devolución del coach</div>
+                          <button onClick={()=>startVoiceDev(selJ,"estrategiaGlobal")}
+                            style={{background:isRec?(L?"#ffdddd":"#3a1010"):"none",border:`1px solid ${isRec?"#c04040":gold}`,borderRadius:"4px",color:isRec?"#e06060":gold,cursor:"pointer",fontSize:"11px",padding:"2px 8px"}}>
+                            {isRec?"🔴 Grabando...":"🎙"}
+                          </button>
+                        </div>
+                        <textarea
+                          value={devTxt}
+                          onChange={e=>updDevolucion(selJ,"estrategiaGlobal",e.target.value)}
+                          placeholder="Devolución sobre la estrategia global..."
+                          style={{...SC.inp,minHeight:"52px",resize:"none",overflow:"hidden",fontSize:"13px"}}
+                          onInput={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";}}
+                        />
+                      </div>
+                    )}
+                    {readOnly&&devTxt&&(
+                      <div style={{background:L?"#f0f6e8":"#102010",border:"1px solid #4a7a20",borderRadius:"4px",padding:"8px",fontSize:"12px",color:L?"#2a5010":"#8abf60"}}>
+                        <strong style={{fontSize:"10px",color:L?"#3a6010":"#6a9a40",textTransform:"uppercase",letterSpacing:"0.5px"}}>Coach: </strong>{devTxt}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                );
+              })()}
+              {/* Reflexión final del coach */}
+              {!readOnly&&onUpdate&&(()=>{
+                const devTxt=devolucionPlan[selJ]?.reflexionFinal||"";
+                const isRec=recDevStatus==="rec_"+selJ+"_reflexionFinal";
+                return(
+                  <div style={{padding:"10px 12px",background:L?"#f5f0e0":"#14120a"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+                      <div style={{color:gold,fontSize:"11px",textTransform:"uppercase",letterSpacing:"1px",fontWeight:"bold"}}>✍️ Reflexión Final del Coach</div>
+                      <button onClick={()=>startVoiceDev(selJ,"reflexionFinal")}
+                        style={{background:isRec?(L?"#ffdddd":"#3a1010"):"none",border:`1px solid ${isRec?"#c04040":gold}`,borderRadius:"4px",color:isRec?"#e06060":gold,cursor:"pointer",fontSize:"11px",padding:"2px 8px"}}>
+                        {isRec?"🔴 Grabando...":"🎙"}
+                      </button>
+                    </div>
+                    <textarea
+                      value={devTxt}
+                      onChange={e=>updDevolucion(selJ,"reflexionFinal",e.target.value)}
+                      placeholder="Reflexión global sobre el plan mental del jugador..."
+                      style={{...SC.inp,minHeight:"60px",resize:"none",overflow:"hidden",fontSize:"13px",background:L?"#faf5e8":"#1a1808",border:`2px solid ${gold}`}}
+                      onInput={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";}}
+                    />
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </div>
 
         {/* Tabla de anotaciones por hoyo */}
         {(()=>{
