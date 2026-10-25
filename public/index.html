@@ -2940,95 +2940,135 @@ function ClaseStatsPanel({alumnos}){
   function calcClaseStats(cl,alumno){
     const j=cl.jugadores.find(j=>j.apellido===alumno.apellido&&j.nombre===alumno.nombre);
     if(!j)return null;
-    const holes=Object.values(j.holes||{});
-    const totalShots=holes.reduce((s,h)=>s+(parseInt(h.shots)||0),0);
-    const totalPutts=holes.reduce((s,h)=>s+(parseInt(h.putts)||0),0);
-    const totalChips=holes.reduce((s,h)=>s+(parseInt(h.chips)||0),0);
-    const totalBunker=holes.reduce((s,h)=>s+(parseInt(h.bunker)||0),0);
-    const tirosGreen=holes.flatMap(h=>h.tirosGreen||[]);
-    const onGreen=tirosGreen.filter(t=>t.resultado==="green").length;
-    const totalTiros=tirosGreen.length;
-    const gir=totalTiros>0?Math.round(onGreen/totalTiros*100):null;
-    const puttsPerHole=holes.length>0?(totalPutts/holes.length).toFixed(2):null;
-    return{totalShots,totalPutts,totalChips,totalBunker,gir,puttsPerHole,holes:holes.length,j};
+    const holesArr=Object.values(j.holes||{});
+    const holesConGolpes=holesArr.filter(h=>parseInt(h.shots)>0);
+    const n=holesConGolpes.length;
+    if(!n)return null;
+    const totalShots=holesConGolpes.reduce((s,h)=>s+(parseInt(h.shots)||0),0);
+    const totalPutts=holesArr.reduce((s,h)=>s+(parseInt(h.putts)||0),0);
+    const totalChips=holesArr.reduce((s,h)=>s+(parseInt(h.chips)||0),0);
+    const totalBunker=holesArr.reduce((s,h)=>s+(parseInt(h.bunker)||0),0);
+    const avgPuttsH=(totalPutts/n).toFixed(2);
+    const avgChipsH=(totalChips/n).toFixed(2);
+    const avgBunkerH=(totalBunker/n).toFixed(2);
+    const dp1vals=holesArr.map(h=>parseFloat(h.distPutt1)).filter(v=>v>0);
+    const avgDistPutt1=dp1vals.length?(dp1vals.reduce((a,b)=>a+b,0)/dp1vals.length).toFixed(1):null;
+    const tirosGreen=holesArr.flatMap(h=>Array.isArray(h.tirosGreen)?h.tirosGreen:[]);
+    const tirosConRes=tirosGreen.filter(t=>t.resultado==="si"||t.resultado==="no");
+    const greenSi=tirosConRes.filter(t=>t.resultado==="si").length;
+    const girPct=tirosConRes.length?Math.round(greenSi/tirosConRes.length*100):null;
+    const parTotal=holesConGolpes.reduce((s,h)=>s+(parseInt(h.par)||0),0);
+    const neto=parTotal>0?totalShots-parTotal:null;
+    return{n,totalShots,totalPutts,totalChips,totalBunker,avgPuttsH,avgChipsH,avgBunkerH,avgDistPutt1,girPct,neto,parTotal,j};
   }
 
+  function numAvg(arr){return arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length):null;}
+  function fmtAvg(v,dec){return v!==null?v.toFixed(dec):"—";}
+  function fmtNeto(v){if(v===null)return"—";const r=typeof v==="number"&&!Number.isInteger(v)?v.toFixed(1):v;return(v>0?"+":"")+r;}
+
+  const COLS=[
+    {key:"fecha",   label:"Fecha",        align:"left"},
+    {key:"cancha",  label:"Cancha",       align:"left"},
+    {key:"golpes",  label:"Golpes",       align:"right"},
+    {key:"neto",    label:"Neto",         align:"right"},
+    {key:"puttsH",  label:"Putts/h",      align:"right"},
+    {key:"chipsH",  label:"Chips/h",      align:"right"},
+    {key:"bunkerH", label:"Búnker/h",     align:"right"},
+    {key:"dist1p",  label:"Dist. 1ª putt",align:"right"},
+    {key:"gir",     label:"GIR%",         align:"right"},
+  ];
+
   if(selAlumno){
-    const statsArr=selAlumno.clases.map(cl=>({cl,stats:calcClaseStats(cl,selAlumno)})).filter(x=>x.stats);
-    return(
+    const statsArr=selAlumno.clases.map(cl=>({cl,stats:calcClaseStats(cl,selAlumno)})).filter(x=>x.stats&&x.stats.n>0);
+    if(!statsArr.length)return(
       <div>
         <button style={{...S.btn("g"),marginBottom:"14px"}} onClick={()=>setSelAlumnoKey(null)}>← Volver</button>
-        <div style={{color:gold,fontSize:"14px",fontWeight:"bold",marginBottom:"14px"}}>{selAlumno.apellido}, {selAlumno.nombre} — {statsArr.length} clase{statsArr.length!==1?"s":""}</div>
+        <div style={{...S.card,color:"#b09050",textAlign:"center",padding:"24px"}}>Sin datos suficientes para mostrar estadísticas.</div>
+      </div>
+    );
 
-        {/* Proceso acumulado */}
-        {statsArr.length>1&&(
-          <div style={{...S.card,marginBottom:"14px",background:"#141210",border:"1px solid #7a6030"}}>
-            <div style={{color:gold,fontSize:"11px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"10px"}}>📈 Proceso acumulado</div>
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse",fontSize:"11px"}}>
-                <thead>
-                  <tr>
-                    {["Fecha","Golpes","Putts/h","Chips","GIR%"].map(h=>(
-                      <th key={h} style={{color:"#b09050",padding:"4px 6px",borderBottom:"1px solid #5a4a20",textAlign:"right",whiteSpace:"nowrap"}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {statsArr.map(({cl,stats},i)=>{
-                    const prev=i>0?statsArr[i-1].stats:null;
-                    const diff=prev?stats.totalShots-prev.totalShots:null;
-                    return(
-                      <tr key={cl.id} style={{background:i%2===0?"transparent":"#1a1612"}}>
-                        <td style={{color:"#b09050",padding:"5px 6px"}}>{cl.fecha}</td>
-                        <td style={{color:"#f5ead0",fontWeight:"bold",padding:"5px 6px",textAlign:"right"}}>
-                          {stats.totalShots}
-                          {diff!==null&&<span style={{marginLeft:"4px",fontSize:"10px",color:diff<0?"#6abf6a":diff>0?"#cf6679":"#b09050"}}>{diff<0?`▼${Math.abs(diff)}`:diff>0?`▲${diff}`:"="}</span>}
-                        </td>
-                        <td style={{color:"#f5ead0",padding:"5px 6px",textAlign:"right"}}>{stats.puttsPerHole}</td>
-                        <td style={{color:"#f5ead0",padding:"5px 6px",textAlign:"right"}}>{stats.totalChips}</td>
-                        <td style={{color:"#f5ead0",padding:"5px 6px",textAlign:"right"}}>{stats.gir!==null?stats.gir+"%":"—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+    const avgGolpes=numAvg(statsArr.map(x=>x.stats.totalShots));
+    const avgNeto=numAvg(statsArr.filter(x=>x.stats.neto!==null).map(x=>x.stats.neto));
+    const avgPH=numAvg(statsArr.map(x=>parseFloat(x.stats.avgPuttsH)));
+    const avgCH=numAvg(statsArr.map(x=>parseFloat(x.stats.avgChipsH)));
+    const avgBH=numAvg(statsArr.map(x=>parseFloat(x.stats.avgBunkerH)));
+    const avgDP1=numAvg(statsArr.filter(x=>x.stats.avgDistPutt1!==null).map(x=>parseFloat(x.stats.avgDistPutt1)));
+    const avgGIR=numAvg(statsArr.filter(x=>x.stats.girPct!==null).map(x=>x.stats.girPct));
 
-        {/* Foto de cada clase */}
-        {statsArr.map(({cl,stats})=>(
-          <div key={cl.id} style={{...S.card,marginBottom:"12px"}}>
-            <div style={{color:gold,fontSize:"12px",fontWeight:"bold",marginBottom:"8px"}}>{cl.fecha} · {cl.courseName}{cl.configName?` · ${cl.configName}`:""}</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px",marginBottom:"8px"}}>
-              <div style={{background:"#1a1612",border:"1px solid #5a4a20",borderRadius:"6px",padding:"10px",textAlign:"center"}}>
-                <div style={{color:gold,fontSize:"20px",fontWeight:"bold"}}>{stats.totalShots}</div>
-                <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px"}}>GOLPES</div>
-              </div>
-              <div style={{background:"#1a1612",border:"1px solid #5a4a20",borderRadius:"6px",padding:"10px",textAlign:"center"}}>
-                <div style={{color:"#f5ead0",fontSize:"20px",fontWeight:"bold"}}>{stats.totalPutts}</div>
-                <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px"}}>PUTTS</div>
-              </div>
-              <div style={{background:"#1a1612",border:"1px solid #5a4a20",borderRadius:"6px",padding:"10px",textAlign:"center"}}>
-                <div style={{color:"#f5ead0",fontSize:"20px",fontWeight:"bold"}}>{stats.gir!==null?stats.gir+"%":"—"}</div>
-                <div style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px"}}>GIR%</div>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:"10px",fontSize:"11px",color:"#b09050"}}>
-              <span>{stats.holes} hoyos</span>
-              <span>·</span>
-              <span>{stats.puttsPerHole} putts/h</span>
-              {stats.totalChips>0&&<><span>·</span><span>{stats.totalChips} chips</span></>}
-              {stats.totalBunker>0&&<><span>·</span><span>{stats.totalBunker} búnker</span></>}
-            </div>
-            {/* Notas del coach si hay */}
-            {stats.j.notaGeneral&&(
-              <div style={{marginTop:"8px",padding:"8px",background:"#1a1612",borderRadius:"4px",fontSize:"12px",color:"#f0e8d0"}}>
-                <span style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px"}}>NOTA COACH: </span>{stats.j.notaGeneral}
-              </div>
-            )}
+    const thS={color:"#b09050",padding:"7px 10px",borderBottom:"2px solid #5a4a20",whiteSpace:"nowrap",fontSize:"11px",letterSpacing:"0.5px",textTransform:"uppercase",fontWeight:"bold"};
+    const tdS=(align,bold,color)=>({padding:"7px 10px",textAlign:align||"right",color:color||"#f5ead0",fontWeight:bold?"bold":"normal",fontSize:"12px",whiteSpace:"nowrap",borderBottom:"1px solid #2a2218"});
+    const ftS=(align,color)=>({padding:"8px 10px",textAlign:align||"right",color:color||gold,fontWeight:"bold",fontSize:"12px",background:"#1a1612",whiteSpace:"nowrap",borderTop:"2px solid #C9A84C"});
+
+    return(
+      <div>
+        <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"14px",flexWrap:"wrap"}}>
+          <button style={{...S.btn("g")}} onClick={()=>setSelAlumnoKey(null)}>← Volver</button>
+          <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{selAlumno.apellido}, {selAlumno.nombre}</div>
+          <div style={{color:"#b09050",fontSize:"11px"}}>{statsArr.length} clase{statsArr.length!==1?"s":""}</div>
+        </div>
+
+        <div style={{...S.card,padding:"0",overflow:"hidden"}}>
+          <div style={{padding:"12px 16px",borderBottom:"1px solid #3a2e1a",display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"6px"}}>
+            <div style={{color:gold,fontSize:"13px",fontWeight:"bold",letterSpacing:"1px"}}>📊 Estadísticas por clase</div>
+            <div style={{color:"#b09050",fontSize:"11px"}}>{selAlumno.apellido}, {selAlumno.nombre} · {statsArr.length} clase{statsArr.length!==1?"s":""}</div>
           </div>
-        ))}
+
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse",minWidth:"680px"}}>
+              <thead>
+                <tr style={{background:"#141210"}}>
+                  {COLS.map(c=>(
+                    <th key={c.key} style={{...thS,textAlign:c.align||"right"}}>{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {statsArr.map(({cl,stats},i)=>{
+                  const nc=stats.neto;
+                  const ncColor=nc===null?"#b09050":nc<0?"#6abf6a":nc>0?"#cf6679":"#b09050";
+                  const gcColor=stats.girPct===null?"#b09050":stats.girPct>=50?"#6abf6a":stats.girPct>=30?"#C9A84C":"#cf6679";
+                  return(
+                    <tr key={cl.id} style={{background:i%2===0?"transparent":"#181410"}}>
+                      <td style={tdS("left",false,"#b09050")}>{cl.fecha}</td>
+                      <td style={tdS("left",false,"#c8b87a")}>{cl.courseName||"—"}{cl.configName?` · ${cl.configName}`:""}</td>
+                      <td style={tdS("right",true,gold)}>{stats.totalShots}</td>
+                      <td style={tdS("right",false,ncColor)}>{fmtNeto(nc)}</td>
+                      <td style={tdS("right")}>{stats.avgPuttsH}</td>
+                      <td style={tdS("right")}>{stats.avgChipsH}</td>
+                      <td style={tdS("right")}>{stats.avgBunkerH}</td>
+                      <td style={tdS("right")}>{stats.avgDistPutt1!==null?stats.avgDistPutt1+" m":"—"}</td>
+                      <td style={tdS("right",false,gcColor)}>{stats.girPct!==null?stats.girPct+"%":"—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td style={ftS("left","#C9A84C")}>PROMEDIO</td>
+                  <td style={ftS("left","#b09050")}>{statsArr.length} clases</td>
+                  <td style={ftS("right",gold)}>{fmtAvg(avgGolpes,1)}</td>
+                  <td style={{...ftS("right"),color:avgNeto===null?"#b09050":avgNeto<0?"#6abf6a":avgNeto>0?"#cf6679":"#b09050"}}>{fmtNeto(avgNeto!==null?avgNeto:null)}</td>
+                  <td style={ftS("right")}>{fmtAvg(avgPH,2)}</td>
+                  <td style={ftS("right")}>{fmtAvg(avgCH,2)}</td>
+                  <td style={ftS("right")}>{fmtAvg(avgBH,2)}</td>
+                  <td style={ftS("right")}>{avgDP1!==null?avgDP1.toFixed(1)+" m":"—"}</td>
+                  <td style={{...ftS("right"),color:avgGIR===null?"#b09050":avgGIR>=50?"#6abf6a":avgGIR>=30?"#C9A84C":"#cf6679"}}>{avgGIR!==null?Math.round(avgGIR)+"%":"—"}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div style={{padding:"9px 16px",borderTop:"1px solid #2a2218",display:"flex",gap:"14px",flexWrap:"wrap"}}>
+            <span style={{fontSize:"10px",color:"#6abf6a"}}>● Verde = bajo par / ≥50% GIR</span>
+            <span style={{fontSize:"10px",color:"#C9A84C"}}>● Amarillo = 30–49% GIR</span>
+            <span style={{fontSize:"10px",color:"#cf6679"}}>● Rojo = sobre par / &lt;30% GIR</span>
+            <span style={{fontSize:"10px",color:"#b09050"}}>— = sin datos</span>
+          </div>
+        </div>
+
+        <div style={{marginTop:"10px",fontSize:"10px",color:"#7a6030",lineHeight:"1.7"}}>
+          <strong style={{color:"#9a8040"}}>Referencia:</strong> Golpes = total de golpes · Neto = vs par del recorrido · /h = por hoyo jugado · Dist. 1ª putt = promedio distancia primer putt · GIR% = tiros al green que llegaron (si/no)
+        </div>
       </div>
     );
   }
@@ -3040,18 +3080,24 @@ function ClaseStatsPanel({alumnos}){
         const key=`${a.apellido}|${a.nombre}`;
         const clases=a.clases;
         const ultima=clases[clases.length-1];
-        const stats=ultima?calcClaseStats(ultima,a):null;
+        const lastStats=ultima?calcClaseStats(ultima,a):null;
+        const allStats=clases.map(cl=>calcClaseStats(cl,a)).filter(Boolean);
+        const avgShots=allStats.length?Math.round(allStats.reduce((s,x)=>s+x.totalShots,0)/allStats.length):null;
         return(
           <div key={key} style={{...S.card,cursor:"pointer",marginBottom:"8px"}} onClick={()=>setSelAlumnoKey(key)}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
-                <div style={{color:"#f5ead0",fontWeight:"bold"}}>{a.apellido}, {a.nombre}</div>
-                <div style={{color:"#b09050",fontSize:"11px"}}>{clases.length} clase{clases.length!==1?"s":""} · última: {ultima?.fecha||"—"}</div>
+                <div style={{color:"#f5ead0",fontWeight:"bold",fontSize:"13px"}}>{a.apellido}, {a.nombre}</div>
+                <div style={{color:"#b09050",fontSize:"11px",marginTop:"2px"}}>
+                  {clases.length} clase{clases.length!==1?"s":""}
+                  {ultima&&<> · última: {ultima.fecha}</>}
+                </div>
               </div>
-              {stats&&<div style={{textAlign:"right"}}>
-                <div style={{color:gold,fontSize:"18px",fontWeight:"bold"}}>{stats.totalShots}</div>
-                <div style={{color:"#b09050",fontSize:"10px"}}>golpes</div>
-              </div>}
+              <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"2px"}}>
+                {lastStats&&<div style={{color:gold,fontSize:"17px",fontWeight:"bold",lineHeight:"1"}}>{lastStats.totalShots}<span style={{color:"#b09050",fontSize:"9px",marginLeft:"3px"}}>ult.</span></div>}
+                {avgShots&&<div style={{color:"#b09050",fontSize:"10px"}}>x̄ {avgShots} golpes</div>}
+                <div style={{color:"#7a6030",fontSize:"10px"}}>Ver tabla →</div>
+              </div>
             </div>
           </div>
         );
