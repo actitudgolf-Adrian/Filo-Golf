@@ -2501,9 +2501,18 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
     const tirosGreenAll=holes.flatMap(h=>Array.isArray(h.tirosGreen)?h.tirosGreen:[]);
     const tirosConDist=tirosGreenAll.filter(t=>parseFloat(t.dist)>0);
     const avgDistGreen=tirosConDist.length?(tirosConDist.reduce((s,t)=>s+parseFloat(t.dist),0)/tirosConDist.length).toFixed(1):"—";
-    const tirosConRes=tirosGreenAll.filter(t=>t.resultado==="si"||t.resultado==="no");
-    const greenSi=tirosConRes.filter(t=>t.resultado==="si").length;
-    const pctGreen=tirosConRes.length?(greenSi/tirosConRes.length*100).toFixed(0)+"% ("+greenSi+"/"+tirosConRes.length+")"  :"—";
+    // GAPI: Green Alcanzado en Primer Intento — solo tirosGreen[0] por hoyo
+    const hoyosConTiro=holes.filter(h=>Array.isArray(h.tirosGreen)&&h.tirosGreen.length>0);
+    const gapiHoyos=hoyosConTiro.filter(h=>h.tirosGreen[0].resultado==="green");
+    const gapiN=gapiHoyos.length;
+    const gapiTotal=hoyosConTiro.length;
+    // Dist. promedio primer tiro (todos los intentos)
+    const distPrimerTiroVals=hoyosConTiro.map(h=>parseFloat(h.tirosGreen[0].dist)).filter(v=>v>0);
+    const avgDistTodo=distPrimerTiroVals.length?(distPrimerTiroVals.reduce((a,b)=>a+b,0)/distPrimerTiroVals.length).toFixed(1):"—";
+    // Dist. promedio primer tiro cuando acierta
+    const distGapiVals=gapiHoyos.map(h=>parseFloat(h.tirosGreen[0].dist)).filter(v=>v>0);
+    const avgDistGapi=distGapiVals.length?(distGapiVals.reduce((a,b)=>a+b,0)/distGapiVals.length).toFixed(1):"—";
+    const pctGapi=gapiTotal>0?(gapiN+"/"+gapiTotal+" ("+Math.round(gapiN/gapiTotal*100)+"%)"):"—";
     const porPar={};
     [3,4,5].forEach(p=>{
       const ph=holes.filter(h=>parseInt(h.par)===p&&parseInt(h.shots)>0);
@@ -2513,7 +2522,7 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
         porPar[p]={n:ph.length,avgDiff:sign+avgDiff.toFixed(2)};
       }
     });
-    return{n,totalPutts,totalChips,totalBunker,avgPuttsH,avgChipsH,avgBunkerH,avgDistPutt1,sumDistPutt1,dp1count:dp1vals.length,avgDistGreen,pctGreen,tirosTotal:tirosGreenAll.length,porPar};
+    return{n,totalPutts,totalChips,totalBunker,avgPuttsH,avgChipsH,avgBunkerH,avgDistPutt1,sumDistPutt1,dp1count:dp1vals.length,avgDistGreen,gapiN,gapiTotal,pctGapi,avgDistTodo,avgDistGapi,porPar};
   }
 
   function generarPDF(jIdx){
@@ -2647,8 +2656,9 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
       <tbody>
         ${st.dp1count>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Dist. promedio 1er putt</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.avgDistPutt1} yds</td></tr>`:""}
         ${st.dp1count>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Dist. total pateada (suma)</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.sumDistPutt1} yds (${st.dp1count} hoyos)</td></tr>`:""}
-        ${st.tirosTotal>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Tiros al green — Dist. promedio</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.avgDistGreen} yds</td></tr>`:""}
-        ${st.tirosTotal>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Greens alcanzados (GIR)</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.pctGreen}</td></tr>`:""}
+        ${st.gapiTotal>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">GAPI (Green Alcanzado en Primer Intento)</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.pctGapi}</td></tr>`:""}
+        ${st.gapiTotal>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Dist. promedio primer tiro al green (todos)</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.avgDistTodo} m</td></tr>`:""}
+        ${st.gapiN>0?`<tr><td style="border:1px solid #ddd;padding:6px 8px;color:#555">Dist. promedio cuando acierta el green</td><td style="border:1px solid #ddd;padding:6px 8px;text-align:center;font-weight:bold">${st.avgDistGapi} m</td></tr>`:""}
       </tbody>
     </table>
     ${Object.keys(st.porPar).length?`
@@ -2954,12 +2964,19 @@ function ClaseStatsPanel({alumnos}){
     const dp1vals=holesArr.map(h=>parseFloat(h.distPutt1)).filter(v=>v>0);
     const avgDistPutt1=dp1vals.length?(dp1vals.reduce((a,b)=>a+b,0)/dp1vals.length).toFixed(1):null;
     const tirosGreen=holesArr.flatMap(h=>Array.isArray(h.tirosGreen)?h.tirosGreen:[]);
-    const tirosConRes=tirosGreen.filter(t=>t.resultado==="si"||t.resultado==="no");
-    const greenSi=tirosConRes.filter(t=>t.resultado==="si").length;
-    const girPct=tirosConRes.length?Math.round(greenSi/tirosConRes.length*100):null;
+    // GAPI: solo primer tiro por hoyo
+    const hoyosConTiro=holesArr.filter(h=>Array.isArray(h.tirosGreen)&&h.tirosGreen.length>0);
+    const gapiHoyos=hoyosConTiro.filter(h=>h.tirosGreen[0].resultado==="green");
+    const gapiN=gapiHoyos.length;
+    const gapiTotal=hoyosConTiro.length;
+    const gapiPct=gapiTotal>0?Math.round(gapiN/gapiTotal*100):null;
+    const distTodoVals=hoyosConTiro.map(h=>parseFloat(h.tirosGreen[0].dist)).filter(v=>v>0);
+    const avgDistTodo=distTodoVals.length?(distTodoVals.reduce((a,b)=>a+b,0)/distTodoVals.length).toFixed(1):null;
+    const distGapiVals=gapiHoyos.map(h=>parseFloat(h.tirosGreen[0].dist)).filter(v=>v>0);
+    const avgDistGapi=distGapiVals.length?(distGapiVals.reduce((a,b)=>a+b,0)/distGapiVals.length).toFixed(1):null;
     const parTotal=holesConGolpes.reduce((s,h)=>s+(parseInt(h.par)||0),0);
     const neto=parTotal>0?totalShots-parTotal:null;
-    return{n,totalShots,totalPutts,totalChips,totalBunker,avgPuttsH,avgChipsH,avgBunkerH,avgDistPutt1,girPct,neto,parTotal,j};
+    return{n,totalShots,totalPutts,totalChips,totalBunker,avgPuttsH,avgChipsH,avgBunkerH,avgDistPutt1,gapiN,gapiTotal,gapiPct,avgDistTodo,avgDistGapi,neto,parTotal,j};
   }
 
   function numAvg(arr){return arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length):null;}
@@ -2975,7 +2992,7 @@ function ClaseStatsPanel({alumnos}){
     {key:"chipsH",  label:"Chips/h",      align:"right"},
     {key:"bunkerH", label:"Búnker/h",     align:"right"},
     {key:"dist1p",  label:"Dist. 1ª putt",align:"right"},
-    {key:"gir",     label:"GIR%",         align:"right"},
+    {key:"gapi",    label:"GAPI",          align:"right"},
   ];
 
   if(selAlumno){
@@ -2993,7 +3010,7 @@ function ClaseStatsPanel({alumnos}){
     const avgCH=numAvg(statsArr.map(x=>parseFloat(x.stats.avgChipsH)));
     const avgBH=numAvg(statsArr.map(x=>parseFloat(x.stats.avgBunkerH)));
     const avgDP1=numAvg(statsArr.filter(x=>x.stats.avgDistPutt1!==null).map(x=>parseFloat(x.stats.avgDistPutt1)));
-    const avgGIR=numAvg(statsArr.filter(x=>x.stats.girPct!==null).map(x=>x.stats.girPct));
+    const avgGAPI=numAvg(statsArr.filter(x=>x.stats.gapiPct!==null).map(x=>x.stats.gapiPct));
 
     const thS={color:"#b09050",padding:"7px 10px",borderBottom:"2px solid #5a4a20",whiteSpace:"nowrap",fontSize:"11px",letterSpacing:"0.5px",textTransform:"uppercase",fontWeight:"bold"};
     const tdS=(align,bold,color)=>({padding:"7px 10px",textAlign:align||"right",color:color||"#f5ead0",fontWeight:bold?"bold":"normal",fontSize:"12px",whiteSpace:"nowrap",borderBottom:"1px solid #2a2218"});
@@ -3026,7 +3043,7 @@ function ClaseStatsPanel({alumnos}){
                 {statsArr.map(({cl,stats},i)=>{
                   const nc=stats.neto;
                   const ncColor=nc===null?"#b09050":nc<0?"#6abf6a":nc>0?"#cf6679":"#b09050";
-                  const gcColor=stats.girPct===null?"#b09050":stats.girPct>=50?"#6abf6a":stats.girPct>=30?"#C9A84C":"#cf6679";
+                  const gcColor=stats.gapiPct===null?"#b09050":stats.gapiPct>=50?"#6abf6a":stats.gapiPct>=30?"#C9A84C":"#cf6679";
                   return(
                     <tr key={cl.id} style={{background:i%2===0?"transparent":"#181410"}}>
                       <td style={tdS("left",false,"#b09050")}>{cl.fecha}</td>
@@ -3037,7 +3054,7 @@ function ClaseStatsPanel({alumnos}){
                       <td style={tdS("right")}>{stats.avgChipsH}</td>
                       <td style={tdS("right")}>{stats.avgBunkerH}</td>
                       <td style={tdS("right")}>{stats.avgDistPutt1!==null?stats.avgDistPutt1+" m":"—"}</td>
-                      <td style={tdS("right",false,gcColor)}>{stats.girPct!==null?stats.girPct+"%":"—"}</td>
+                      <td style={tdS("right",false,gcColor)} title={stats.gapiTotal>0?`x̄ todos: ${stats.avgDistTodo}m · x̄ aciertos: ${stats.avgDistGapi}m`:""}>{stats.gapiPct!==null?`${stats.gapiN}/${stats.gapiTotal} (${stats.gapiPct}%)`:"—"}</td>
                     </tr>
                   );
                 })}
@@ -3052,22 +3069,22 @@ function ClaseStatsPanel({alumnos}){
                   <td style={ftS("right")}>{fmtAvg(avgCH,2)}</td>
                   <td style={ftS("right")}>{fmtAvg(avgBH,2)}</td>
                   <td style={ftS("right")}>{avgDP1!==null?avgDP1.toFixed(1)+" m":"—"}</td>
-                  <td style={{...ftS("right"),color:avgGIR===null?"#b09050":avgGIR>=50?"#6abf6a":avgGIR>=30?"#C9A84C":"#cf6679"}}>{avgGIR!==null?Math.round(avgGIR)+"%":"—"}</td>
+                  <td style={{...ftS("right"),color:avgGAPI===null?"#b09050":avgGAPI>=50?"#6abf6a":avgGAPI>=30?"#C9A84C":"#cf6679"}}>{avgGAPI!==null?Math.round(avgGAPI)+"%":"—"}</td>
                 </tr>
               </tfoot>
             </table>
           </div>
 
           <div style={{padding:"9px 16px",borderTop:"1px solid #2a2218",display:"flex",gap:"14px",flexWrap:"wrap"}}>
-            <span style={{fontSize:"10px",color:"#6abf6a"}}>● Verde = bajo par / ≥50% GIR</span>
-            <span style={{fontSize:"10px",color:"#C9A84C"}}>● Amarillo = 30–49% GIR</span>
-            <span style={{fontSize:"10px",color:"#cf6679"}}>● Rojo = sobre par / &lt;30% GIR</span>
+            <span style={{fontSize:"10px",color:"#6abf6a"}}>● Verde = bajo par / ≥50% GAPI</span>
+            <span style={{fontSize:"10px",color:"#C9A84C"}}>● Amarillo = 30–49% GAPI</span>
+            <span style={{fontSize:"10px",color:"#cf6679"}}>● Rojo = sobre par / &lt;30% GAPI</span>
             <span style={{fontSize:"10px",color:"#b09050"}}>— = sin datos</span>
           </div>
         </div>
 
         <div style={{marginTop:"10px",fontSize:"10px",color:"#7a6030",lineHeight:"1.7"}}>
-          <strong style={{color:"#9a8040"}}>Referencia:</strong> Golpes = total de golpes · Neto = vs par del recorrido · /h = por hoyo jugado · Dist. 1ª putt = promedio distancia primer putt · GIR% = tiros al green que llegaron (si/no)
+          <strong style={{color:"#9a8040"}}>Referencia:</strong> Golpes = total · Neto = vs par del recorrido · /h = por hoyo jugado · Dist. 1ª putt = promedio distancia primer putt · GAPI = Green Alcanzado en Primer Intento (n/total · % · pasar el cursor para ver distancias)
         </div>
       </div>
     );
