@@ -2430,6 +2430,7 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
   const [verPlan,setVerPlan]=useState(false);
   const [verAnotaciones,setVerAnotaciones]=useState(true);
   const [previewHtml,setPreviewHtml]=useState(null);
+  const [verTarjeta,setVerTarjeta]=useState(false);
 
   const L=lightMode||false;
   const bg=L?"#f5f0e8":"#0f0d0a";
@@ -2501,8 +2502,8 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
     const tirosGreenAll=holes.flatMap(h=>Array.isArray(h.tirosGreen)?h.tirosGreen:[]);
     const tirosConDist=tirosGreenAll.filter(t=>parseFloat(t.dist)>0);
     const avgDistGreen=tirosConDist.length?(tirosConDist.reduce((s,t)=>s+parseFloat(t.dist),0)/tirosConDist.length).toFixed(1):"—";
-    // GAPI: Green Alcanzado en Primer Intento — solo tirosGreen[0] por hoyo
-    const hoyosConTiro=holes.filter(h=>Array.isArray(h.tirosGreen)&&h.tirosGreen.length>0);
+    // GAPI: Green Alcanzado en Primer Intento — solo tirosGreen[0] por hoyo, con golpes jugados
+    const hoyosConTiro=holes.filter(h=>parseInt(h.shots)>0&&Array.isArray(h.tirosGreen)&&h.tirosGreen.length>0);
     const gapiHoyos=hoyosConTiro.filter(h=>h.tirosGreen[0].resultado==="green");
     const gapiN=gapiHoyos.length;
     const gapiTotal=hoyosConTiro.length;
@@ -2877,6 +2878,95 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
             readOnly={readOnly||!onUpdate}/>
         </div>
 
+        {/* Tarjeta de la cancha colapsable */}
+        <div style={{marginBottom:"14px"}}>
+          <button onClick={()=>setVerTarjeta(v=>!v)} style={{width:"100%",background:L?"#f0ebe0":"#1a1612",border:`1px solid ${cardBorder}`,borderRadius:"6px",padding:"10px 14px",color:L?"#6a4a1a":gold,fontSize:"12px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",fontWeight:"bold",letterSpacing:"0.5px"}}>
+            <span>📋 Tarjeta de la cancha</span>
+            <span style={{fontSize:"14px"}}>{verTarjeta?"▲":"▼"}</span>
+          </button>
+          {verTarjeta&&(()=>{
+            const holes=j.holes||{};
+            const numHoles=clase.numHoles||9;
+            const holeNums=Array.from({length:numHoles},(_,i)=>i+1);
+            const totalShots=holeNums.reduce((s,h)=>s+(parseInt((holes[h]||{}).shots)||0),0);
+            const totalPutts=holeNums.reduce((s,h)=>s+(parseInt((holes[h]||{}).putts)||0),0);
+            const totalChips=holeNums.reduce((s,h)=>s+(parseInt((holes[h]||{}).chips)||0),0);
+            const totalBunker=holeNums.reduce((s,h)=>s+(parseInt((holes[h]||{}).bunker)||0),0);
+            const totalPar=holeNums.reduce((s,h)=>s+(parseInt((holes[h]||{}).par)||0),0);
+            const thT={background:L?"#e8dfc8":"#141210",color:L?"#6a4a1a":"#b09050",padding:"5px 7px",textAlign:"center",fontSize:"10px",letterSpacing:"0.5px",textTransform:"uppercase",borderBottom:`1px solid ${cardBorder}`,whiteSpace:"nowrap"};
+            const tdT=(val,bold,color)=>({padding:"5px 7px",textAlign:"center",color:color||(L?"#2a1a08":"#f5ead0"),fontWeight:bold?"bold":"normal",fontSize:"12px",borderBottom:`1px solid ${L?"#e0d4b0":"#2a2218"}`,background:"transparent"});
+            return(
+              <div style={{border:`1px solid ${cardBorder}`,borderTop:"none",borderRadius:"0 0 6px 6px",overflowX:"auto",background:L?"#fff":"#1c1810"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:`${numHoles*52+100}px`}}>
+                  <thead>
+                    <tr>
+                      <th style={{...thT,textAlign:"left",minWidth:"60px"}}>Métrica</th>
+                      {holeNums.map(h=><th key={h} style={thT}>{h}</th>)}
+                      <th style={{...thT,color:L?"#C9A84C":gold}}>TOT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Par */}
+                    <tr>
+                      <td style={{...tdT(null,false,"#b09050"),textAlign:"left",fontSize:"10px",letterSpacing:"0.5px",textTransform:"uppercase"}}>Par</td>
+                      {holeNums.map(h=>{const v=(holes[h]||{}).par;return <td key={h} style={tdT(v,false,L?"#7a5a20":"#b09050")}>{v||"—"}</td>;})}
+                      <td style={{...tdT(totalPar,true,L?"#7a5a20":"#b09050")}}>{totalPar||"—"}</td>
+                    </tr>
+                    {/* Golpes */}
+                    <tr>
+                      <td style={{...tdT(null,false,L?"#2a1a08":"#f5ead0"),textAlign:"left",fontSize:"10px",letterSpacing:"0.5px",textTransform:"uppercase"}}>Golpes</td>
+                      {holeNums.map(h=>{
+                        const hd=holes[h]||{};
+                        const s=parseInt(hd.shots)||0;
+                        const p=parseInt(hd.par)||0;
+                        const diff=s&&p?s-p:null;
+                        const col=diff===null?(L?"#2a1a08":"#f5ead0"):diff<0?"#6abf6a":diff===0?(L?"#7a5a20":"#b09050"):"#cf6679";
+                        return <td key={h} style={tdT(s||"—",true,col)}>{s||"—"}</td>;
+                      })}
+                      <td style={{...tdT(totalShots,true,L?"#C9A84C":gold)}}>{totalShots||"—"}</td>
+                    </tr>
+                    {/* Putts */}
+                    <tr>
+                      <td style={{...tdT(null,false,L?"#2a1a08":"#f5ead0"),textAlign:"left",fontSize:"10px",letterSpacing:"0.5px",textTransform:"uppercase"}}>Putts</td>
+                      {holeNums.map(h=>{const v=parseInt((holes[h]||{}).putts)||0;return <td key={h} style={tdT(v||"—",false,v>=3?"#cf6679":v===1?"#6abf6a":null)}>{v||"—"}</td>;})}
+                      <td style={tdT(totalPutts,true)}>{totalPutts||"—"}</td>
+                    </tr>
+                    {/* Chips — solo si hay alguno */}
+                    {totalChips>0&&(
+                      <tr>
+                        <td style={{...tdT(null,false,L?"#2a1a08":"#f5ead0"),textAlign:"left",fontSize:"10px",letterSpacing:"0.5px",textTransform:"uppercase"}}>Chips</td>
+                        {holeNums.map(h=>{const v=parseInt((holes[h]||{}).chips)||0;return <td key={h} style={tdT(v||"—")}>{v||"—"}</td>;})}
+                        <td style={tdT(totalChips,true)}>{totalChips}</td>
+                      </tr>
+                    )}
+                    {/* Búnker — solo si hay alguno */}
+                    {totalBunker>0&&(
+                      <tr>
+                        <td style={{...tdT(null,false,L?"#2a1a08":"#f5ead0"),textAlign:"left",fontSize:"10px",letterSpacing:"0.5px",textTransform:"uppercase"}}>Búnker</td>
+                        {holeNums.map(h=>{const v=parseInt((holes[h]||{}).bunker)||0;return <td key={h} style={tdT(v||"—")}>{v||"—"}</td>;})}
+                        <td style={tdT(totalBunker,true)}>{totalBunker}</td>
+                      </tr>
+                    )}
+                    {/* GAPI — primer tiro al green */}
+                    <tr>
+                      <td style={{...tdT(null,false,L?"#2a1a08":"#f5ead0"),textAlign:"left",fontSize:"10px",letterSpacing:"0.5px",textTransform:"uppercase"}}>1º tiro green</td>
+                      {holeNums.map(h=>{
+                        const hd=holes[h]||{};
+                        if(!parseInt(hd.shots)||!Array.isArray(hd.tirosGreen)||!hd.tirosGreen.length)return <td key={h} style={tdT("—",false,L?"#c0a060":"#5a4a20")}>—</td>;
+                        const t0=hd.tirosGreen[0];
+                        const esGapi=t0.resultado==="green";
+                        const dist=parseFloat(t0.dist)>0?t0.dist+"m":"";
+                        return <td key={h} style={tdT(esGapi?"✓":"✗",true,esGapi?"#6abf6a":"#cf6679")} title={dist}>{esGapi?"✓":"✗"}{dist&&<span style={{fontSize:"9px",display:"block",color:L?"#7a5a20":"#b09050",fontWeight:"normal"}}>{dist}</span>}</td>;
+                      })}
+                      <td style={tdT(null,false,L?"#b09050":"#b09050")}> </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
+
         <div style={{display:"flex",gap:"8px"}}>
           <button style={{background:L?"#e8f0e0":"#182010",color:L?"#3a6010":"#a8d070",border:`2px solid ${L?"#6a9a30":"#4a7a18"}`,borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1}} onClick={()=>previsualizarInforme(selJ)}>
             👁 Previsualizar Informe
@@ -2965,7 +3055,7 @@ function ClaseStatsPanel({alumnos}){
     const avgDistPutt1=dp1vals.length?(dp1vals.reduce((a,b)=>a+b,0)/dp1vals.length).toFixed(1):null;
     const tirosGreen=holesArr.flatMap(h=>Array.isArray(h.tirosGreen)?h.tirosGreen:[]);
     // GAPI: solo primer tiro por hoyo
-    const hoyosConTiro=holesArr.filter(h=>Array.isArray(h.tirosGreen)&&h.tirosGreen.length>0);
+    const hoyosConTiro=holesArr.filter(h=>parseInt(h.shots)>0&&Array.isArray(h.tirosGreen)&&h.tirosGreen.length>0);
     const gapiHoyos=hoyosConTiro.filter(h=>h.tirosGreen[0].resultado==="green");
     const gapiN=gapiHoyos.length;
     const gapiTotal=hoyosConTiro.length;
