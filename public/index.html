@@ -2179,9 +2179,9 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     const putts=parseInt(hd.putts);
     const par=parseInt(hd.par);
     const dist=parseInt(hd.dist);
-    const distPutt1=parseInt(hd.distPutt1);
+    const distPutt1=parseFloat(hd.distPutt1);
     if(!shots||isNaN(putts)||!par||!dist)return false;
-    if(putts>0&&!distPutt1)return false;
+    if(putts>0&&!(distPutt1>0))return false;
     // Tiro al green: par 3 sin tirosGreen registrados se acepta (se asume tee → green)
     const tirosG=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];
     const hayPenalidad=hd.pen_ob||hd.pen_agua||hd.pen_perdida;
