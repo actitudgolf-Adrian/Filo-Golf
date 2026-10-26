@@ -2813,6 +2813,29 @@ function descargarConRespuesta(){
     setPreviewHtml(html);
   }
 
+  async function enviarInforme(jIdx){
+    const j=clase.jugadores[jIdx];
+    if(!j.username){
+      alert("Este jugador no tiene usuario registrado en la app. No se puede enviar el informe.");
+      return;
+    }
+    const html=generarPDF(jIdx);
+    const payload={
+      coach_username:"coach",
+      player_username:j.username,
+      clase_id:clase.id,
+      html_content:html,
+      created_at:Date.now(),
+      leido:false
+    };
+    const ok=await sbU("informes_jugador",payload);
+    if(ok){
+      alert("✅ Informe enviado a "+j.nombre+" "+j.apellido+" correctamente.");
+    } else {
+      alert("❌ No se pudo enviar el informe. Verificá la conexión o que la tabla informes_jugador exista en Supabase.");
+    }
+  }
+
   const j=clase.jugadores[selJ];
   const total=calcTotal(selJ);
   const putts=calcPutts(selJ);
@@ -3164,13 +3187,23 @@ function descargarConRespuesta(){
           })()}
         </div>
 
-        <div style={{display:"flex",gap:"8px"}}>
-          <button style={{background:L?"#e8f0e0":"#182010",color:L?"#3a6010":"#a8d070",border:`2px solid ${L?"#6a9a30":"#4a7a18"}`,borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1}} onClick={()=>previsualizarInforme(selJ)}>
-            👁 Previsualizar Informe
+        <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+          <button style={{background:L?"#e8f0e0":"#182010",color:L?"#3a6010":"#a8d070",border:`2px solid ${L?"#6a9a30":"#4a7a18"}`,borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1,minWidth:"120px"}} onClick={()=>previsualizarInforme(selJ)}>
+            👁 Previsualizar
           </button>
-          <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1}} onClick={()=>descargarInforme(selJ)}>
-            ↓ Descargar Informe
+          <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1,minWidth:"120px"}} onClick={()=>descargarInforme(selJ)}>
+            ↓ Descargar
           </button>
+          {!readOnly&&clase.jugadores[selJ]?.username&&(
+            <button style={{background:L?"#1a3a6a":"#0a2040",color:L?"#80b8f0":"#6aaee0",border:`2px solid ${L?"#3a70b0":"#1a5090"}`,borderRadius:"4px",padding:"11px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",flex:1,minWidth:"120px"}} onClick={()=>enviarInforme(selJ)}>
+              ✉️ Enviar al jugador
+            </button>
+          )}
+          {!readOnly&&!clase.jugadores[selJ]?.username&&(
+            <div style={{flex:1,minWidth:"120px",padding:"8px",background:L?"#f5f0e0":"#1a1808",border:`1px dashed ${L?"#c8a060":"#5a4020"}`,borderRadius:"4px",fontSize:"11px",color:L?"#8a6020":"#8a6830",textAlign:"center",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              Sin usuario registrado
+            </div>
+          )}
         </div>
       </div>
 
@@ -3179,6 +3212,9 @@ function descargarConRespuesta(){
           <div style={{background:"#1a1612",padding:"10px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",borderBottom:"1px solid #5a4a20"}}>
             <span style={{color:gold,fontWeight:"bold",fontSize:"14px"}}>👁 Vista previa del informe</span>
             <div style={{display:"flex",gap:"8px"}}>
+              {!readOnly&&clase.jugadores[selJ]?.username&&(
+                <button style={{background:"#0a2040",color:"#6aaee0",border:"2px solid #1a5090",borderRadius:"4px",padding:"7px 14px",fontSize:"12px",cursor:"pointer",fontWeight:"bold"}} onClick={()=>{enviarInforme(selJ);setPreviewHtml(null);}}>✉️ Enviar</button>
+              )}
               <button style={{background:`linear-gradient(135deg,${gold},#a8822a)`,color:"#1a1612",border:"none",borderRadius:"4px",padding:"7px 14px",fontSize:"12px",cursor:"pointer",fontWeight:"bold"}} onClick={()=>{descargarInforme(selJ);setPreviewHtml(null);}}>↓ Descargar</button>
               <button style={{background:"#2d2720",color:"#f5ead0",border:"1px solid #5a4a20",borderRadius:"4px",padding:"7px 14px",fontSize:"12px",cursor:"pointer"}} onClick={()=>setPreviewHtml(null)}>✕ Cerrar</button>
             </div>
@@ -3519,6 +3555,7 @@ function ClaseEnCancha(){
           const holesBase={};
           if(cfg){Object.entries(cfg.holes).forEach(([h,v])=>{if(parseInt(h)<=holeCount)holesBase[parseInt(h)]={par:v.par,dist:v.dist,hcpIdx:v.hcpIdx};});}
           return{nombre:j.nombre.trim(),apellido:j.apellido.trim(),hcp:parseInt(j.hcp)||18,
+            username:j.username||"",
             canchaId:j.canchaId,configKey:j.configKey,
             holes:cfg?JSON.parse(JSON.stringify(holesBase)):{},
             notas:{},notaGeneral:"",resumenCoach:"",planJuego:{},notasHoyo:{}};
@@ -3562,9 +3599,15 @@ function ClaseEnCancha(){
                     <input placeholder="Nombre" value={j.nombre} onChange={e=>updJ(i,"nombre",e.target.value)} style={{...S.inp,width:"100%"}}/>
                     <input placeholder="Apellido" value={j.apellido} onChange={e=>updJ(i,"apellido",e.target.value)} style={{...S.inp,width:"100%"}}/>
                   </div>
-                  <div style={{marginBottom:"8px"}}>
-                    <input type="number" placeholder="HCP" value={j.hcp} onChange={e=>updJ(i,"hcp",e.target.value)} min="0" max="54" style={{...S.inp,width:"80px"}}/>
-                    <span style={{color:"#b09050",fontSize:"10px",marginLeft:"8px"}}>handicap</span>
+                  <div style={{display:"grid",gridTemplateColumns:"80px 1fr",gap:"8px",marginBottom:"8px",alignItems:"end"}}>
+                    <div>
+                      <input type="number" placeholder="HCP" value={j.hcp} onChange={e=>updJ(i,"hcp",e.target.value)} min="0" max="54" style={{...S.inp,width:"100%"}}/>
+                      <div style={{color:"#7a6030",fontSize:"9px",marginTop:"2px"}}>handicap</div>
+                    </div>
+                    <div>
+                      <div style={{color:"#b09050",fontSize:"9px",marginBottom:"2px"}}>USUARIO APP <span style={{color:"#5a4020"}}>(opcional)</span></div>
+                      <input placeholder="username del jugador" value={j.username||""} onChange={e=>updJ(i,"username",e.target.value.trim().toLowerCase())} style={{...S.inp,width:"100%",fontSize:"12px"}}/>
+                    </div>
                   </div>
                   <div style={{marginBottom:"6px"}}>
                     <div style={{color:"#b09050",fontSize:"10px",marginBottom:"4px"}}>CANCHA</div>
@@ -4160,6 +4203,114 @@ function CoachPanel(){
   );
 }
 
+// ─── MIS CLASES (jugador) ─────────────────────────────────────────────────────
+function MisClases({user}){
+  const [subTab,setSubTab]=useState("cancha");
+  const [informes,setInformes]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const [selInforme,setSelInforme]=useState(null);
+  const gold2=gold;
+
+  useEffect(()=>{
+    async function load(){
+      setLoading(true);
+      try{
+        const r=await fetch(SB_URL+"/rest/v1/informes_jugador?player_username=eq."+encodeURIComponent(user.username)+"&order=created_at.desc",{headers:H});
+        if(!r.ok){setInformes([]);setLoading(false);return;}
+        const rows=await r.json();
+        setInformes(rows||[]);
+      }catch{setInformes([]);}
+      setLoading(false);
+    }
+    load();
+  },[user.username]);
+
+  async function marcarLeido(inf){
+    if(!inf.leido){
+      await sbPatch("informes_jugador",{id:inf.id},{leido:true});
+      setInformes(prev=>prev.map(x=>x.id===inf.id?{...x,leido:true}:x));
+    }
+    setSelInforme({...inf,leido:true});
+  }
+
+  if(selInforme){
+    return(
+      <div style={S.page}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+          <button style={{background:"#2d2720",color:"#f5ead0",border:"1px solid #5a4a20",borderRadius:"4px",padding:"6px 12px",fontSize:"12px",cursor:"pointer"}} onClick={()=>setSelInforme(null)}>← Volver</button>
+          <span style={{color:gold2,fontSize:"12px",letterSpacing:"1px"}}>Informe del Coach</span>
+        </div>
+        <iframe srcDoc={selInforme.html_content} style={{width:"100%",height:"calc(100vh - 120px)",border:"none",borderRadius:"6px",background:"#fff"}} title="Informe"/>
+      </div>
+    );
+  }
+
+  const cardBg="#1c1810";
+  const cardBorder="#5a4a20";
+
+  return(
+    <div style={S.page}>
+      <div style={{fontSize:"15px",color:gold2,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"14px",borderBottom:"1px solid #5a4a20",paddingBottom:"7px"}}>
+        Mis Clases
+      </div>
+
+      {/* Sub-tabs */}
+      <div style={{display:"flex",gap:"6px",marginBottom:"16px"}}>
+        {[["cancha","🏌 Clases en Cancha"]].map(([k,l])=>(
+          <button key={k} onClick={()=>setSubTab(k)} style={{
+            padding:"8px 14px",fontSize:"12px",borderRadius:"6px",cursor:"pointer",fontWeight:"bold",letterSpacing:"0.5px",
+            background:subTab===k?gold2:"#1c1810",
+            color:subTab===k?"#1a1612":gold2,
+            border:`1px solid ${subTab===k?gold2:"#5a4a20"}`
+          }}>{l}</button>
+        ))}
+      </div>
+
+      {subTab==="cancha"&&(
+        <div>
+          {loading&&<div style={{color:"#b09050",textAlign:"center",padding:"32px"}}>Cargando informes...</div>}
+          {!loading&&informes&&informes.length===0&&(
+            <div style={{...S.card,textAlign:"center",padding:"36px"}}>
+              <div style={{fontSize:"28px",marginBottom:"10px"}}>📬</div>
+              <div style={{color:"#b09050",fontSize:"14px"}}>Todavía no tenés informes de clases.</div>
+              <div style={{color:"#7a6030",fontSize:"12px",marginTop:"6px"}}>Cuando tu coach envíe el informe de una clase, aparecerá acá.</div>
+            </div>
+          )}
+          {!loading&&informes&&informes.length>0&&(
+            <div style={{display:"flex",flexDirection:"column",gap:"10px"}}>
+              {informes.map((inf,i)=>{
+                const fecha=inf.created_at?new Date(parseInt(inf.created_at)).toLocaleDateString("es-AR",{day:"2-digit",month:"short",year:"numeric"}):"—";
+                return(
+                  <div key={inf.id||i} onClick={()=>marcarLeido(inf)} style={{
+                    background:cardBg,border:`1px solid ${cardBorder}`,borderRadius:"8px",
+                    padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",
+                    boxShadow:inf.leido?"none":"0 0 0 2px #3a6a30"
+                  }}>
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
+                        {!inf.leido&&<span style={{background:"#3a6a30",color:"#9adf60",borderRadius:"3px",fontSize:"9px",padding:"2px 6px",letterSpacing:"1px",fontWeight:"bold"}}>NUEVO</span>}
+                        <span style={{color:gold2,fontSize:"13px",fontWeight:"bold"}}>Clase en Cancha</span>
+                      </div>
+                      <div style={{color:"#b09050",fontSize:"12px"}}>{fecha}</div>
+                    </div>
+                    <div style={{color:"#7a6030",fontSize:"18px"}}>›</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!loading&&informes===null&&(
+            <div style={{...S.card,textAlign:"center",padding:"32px",color:"#cf6679"}}>
+              Error al cargar. Verificá tu conexión.
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function App(){
   const [user,setUser]=useState(()=>lsGet("session"));
   const [tab,setTab]=useState(()=>{
@@ -4199,7 +4350,7 @@ function App(){
 
   const nav=user.isCoach
     ?[["stats","Inicio"],["coach","Coach"],["ronda","+ Vuelta"]]
-    :[["stats","Mis Stats"],["myrounds","Mis Vueltas"],["ronda","+ Vuelta"],["canchas","🏌 Canchas"],["profile","Perfil"]];
+    :[["stats","Mis Stats"],["myrounds","Mis Vueltas"],["ronda","+ Vuelta"],["clases","Mis Clases"],["canchas","Canchas"],["profile","Perfil"]];
 
   function go(t){
     if(t==="ronda"){setNR(true);if(user)lsSet("nav:"+user.username,{tab,newRound:true});return;}
@@ -4229,6 +4380,7 @@ function App(){
         :tab==="stats"?<Stats user={user}/>
         :tab==="myrounds"?<MyRounds user={user}/>
         :tab==="coach"&&user.isCoach?<CoachPanel/>
+        :tab==="clases"&&!user.isCoach?<MisClases user={user}/>
         :tab==="canchas"?<MisCanchas user={user}/>
         :tab==="profile"?<Profile user={user} onUpdate={u=>setUser(u)}/>
         :null
