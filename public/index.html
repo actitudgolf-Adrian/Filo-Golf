@@ -3658,6 +3658,17 @@ function ClaseEnCancha(){
       const merged=Object.values(map).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
       lsSet(CLASE_LS,merged);
       setClases(merged);
+      // 4) Verificar si la clase activa local ya fue finalizada en otro dispositivo
+      const activeLocal=lsGet(CLASE_ACTIVE_LS);
+      if(activeLocal&&activeLocal.id){
+        const remoteVersion=merged.find(c=>c.id===activeLocal.id);
+        if(remoteVersion&&remoteVersion.finalizada){
+          // Fue finalizada desde otro dispositivo — limpiar estado local
+          lsSet(CLASE_ACTIVE_LS,null);
+          setCur(null);
+          setPhase("list");
+        }
+      }
       setSyncStatus("ok");
       setTimeout(()=>setSyncStatus("idle"),3000);
     }
