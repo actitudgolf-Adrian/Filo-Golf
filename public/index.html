@@ -3643,27 +3643,29 @@ function ClaseEnCancha(){
   useEffect(()=>{
     async function syncAll(){
       setSyncStatus("syncing");
-      // 1) Subir todas las clases locales que no están en Supabase todavía
       const local=lsGet(CLASE_LS)||[];
-      if(local.length>0){
-        await Promise.all(local.map(c=>sbUpsertClase(c)));
-      }
-      // 2) Bajar todo desde Supabase
+      // 1) Bajar todo desde Supabase primero — remote es la fuente de verdad
       const remote=await sbLoadClases();
       if(!remote){setSyncStatus("err");return;}
-      // 3) Fusionar: remote tiene prioridad (es la fuente de verdad)
+      const remoteIds=new Set(remote.map(c=>c.id));
+      // 2) Subir SOLO las clases locales que no existen en Supabase (huérfanas reales)
+      //    Nunca pisar una clase remota con la versión local — evita sobreescribir finalizada:true
+      const huerfanas=local.filter(c=>!remoteIds.has(c.id));
+      if(huerfanas.length>0){
+        await Promise.all(huerfanas.map(c=>sbUpsertClase(c)));
+      }
+      // 3) Fusionar: remote tiene prioridad absoluta para clases que ya existen allá
       const map={};
       local.forEach(c=>{map[c.id]=c;});
-      remote.forEach(c=>{map[c.id]=c;});
+      remote.forEach(c=>{map[c.id]=c;}); // remote sobreescribe local siempre
       const merged=Object.values(map).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
       lsSet(CLASE_LS,merged);
       setClases(merged);
-      // 4) Verificar si la clase activa local ya fue finalizada en otro dispositivo
+      // 4) Si la clase activa local fue finalizada en otro dispositivo → limpiar
       const activeLocal=lsGet(CLASE_ACTIVE_LS);
       if(activeLocal&&activeLocal.id){
         const remoteVersion=merged.find(c=>c.id===activeLocal.id);
         if(remoteVersion&&remoteVersion.finalizada){
-          // Fue finalizada desde otro dispositivo — limpiar estado local
           lsSet(CLASE_ACTIVE_LS,null);
           setCur(null);
           setPhase("list");
