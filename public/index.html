@@ -3837,7 +3837,7 @@ function ClaseEnCancha(){
     subTab={subTab} setSubTab={setSubTab}
     recStatus={recStatus} setRecStatus={setRecStatus}
     onUpdate={next=>{setCurPersist(next);setCur(next);}}
-    onFinalizar={next=>{setCurPersist(next);setCur(next);setPhase("report");}}
+    onFinalizar={next=>{setCurPersist(next);setCur(next);const arr=[...clases.filter(c=>c.id!==next.id),next];saveClases(arr,next);setPhase("report");}}
     onGuardar={(next,arr)=>{setCurPersist(next);setCur(next);saveClases(arr,next);}}
     lightMode={lightMode} setLightMode={toggleLight}
   />;
