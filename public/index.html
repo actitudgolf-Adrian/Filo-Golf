@@ -1055,6 +1055,24 @@ function HoleCard({hole,data,onChange,readonly,lightMode}){
               <option value="largo">❌ Largo</option>
               <option value="lateral">❌ Lateral</option>
             </select>
+            {/* Aviso: corto/largo/lateral → necesita otro tiro */}
+            {["corto","largo","lateral"].includes(t.resultado)&&!tirosG[i+1]&&!readonly&&(
+              <div style={{marginTop:"5px",fontSize:"11px",color:L?"#b06020":"#e09040",background:L?"#fdf0e0":"#2a1a08",border:`1px solid ${L?"#e0a060":"#6a4020"}`,borderRadius:"4px",padding:"5px 8px"}}>
+                ⚠️ Tiro {i+1} quedó {t.resultado} — agregá el siguiente tiro al green
+              </div>
+            )}
+            {/* Aviso: chip resultado → contador chip debe ser > 0 */}
+            {t.resultado==="chip"&&!(parseInt(d.chips)>0)&&!readonly&&(
+              <div style={{marginTop:"5px",fontSize:"11px",color:L?"#b06020":"#e09040",background:L?"#fdf0e0":"#2a1a08",border:`1px solid ${L?"#e0a060":"#6a4020"}`,borderRadius:"4px",padding:"5px 8px"}}>
+                ⚠️ Marcaste zona chip — completá el contador de chips
+              </div>
+            )}
+            {/* Aviso: bunker resultado → contador bunker debe ser > 0 */}
+            {t.resultado==="bunker"&&!(parseInt(d.bunker)>0)&&!readonly&&(
+              <div style={{marginTop:"5px",fontSize:"11px",color:L?"#b06020":"#e09040",background:L?"#fdf0e0":"#2a1a08",border:`1px solid ${L?"#e0a060":"#6a4020"}`,borderRadius:"4px",padding:"5px 8px"}}>
+                ⚠️ Marcaste bunker — completá el contador de búnker
+              </div>
+            )}
           </div>
         ))}
         {!readonly&&!greenCerrado&&(
@@ -1164,8 +1182,20 @@ function NewRound({user,onSave,onCancel,editRound}){
           if(!t.resultado&&(t.dist||t.palo))avisos.push(`Hoyo ${h} tiro ${i+1}: falta resultado`);
         });
       }
+      // Nuevas validaciones: corto/largo/lateral y chip/bunker
+      tirosG.forEach((t,i)=>{
+        if(["corto","largo","lateral"].includes(t.resultado)&&!tirosG[i+1])
+          avisos.push(`Hoyo ${h} tiro ${i+1}: resultado ${t.resultado} — falta el tiro siguiente`);
+        if(t.resultado==="chip"&&!(parseInt(hd.chips)>0))
+          avisos.push(`Hoyo ${h} tiro ${i+1}: resultado chip — completá el contador de chips`);
+        if(t.resultado==="bunker"&&!(parseInt(hd.bunker)>0))
+          avisos.push(`Hoyo ${h} tiro ${i+1}: resultado bunker — completá el contador de búnker`);
+      });
     }
-    if(avisos.length){setErr("Completá estos datos antes de guardar:\n• "+avisos.slice(0,5).join("\n• ")+(avisos.length>5?`\n• ...y ${avisos.length-5} más`:"")); return;}
+    if(avisos.length){
+      const msg="⚠️ Datos incompletos:\n• "+avisos.slice(0,6).join("\n• ")+(avisos.length>6?`\n• ...y ${avisos.length-6} más`:"");
+      if(!window.confirm(msg+"\n\n¿Guardar de todas formas?"))return;
+    }
     setSaving(true);
     try{
       const id=editRound?editRound.id:Date.now().toString();
@@ -1647,8 +1677,10 @@ function MyRounds({user}){
         const dp1r=(()=>{const vals=[];Object.values(r.holes||{}).forEach(h=>{const v=parseFloat(h.distPutt1);if(v>0)vals.push(v);});return vals;})();
         const avgDP1r=dp1r.length?(dp1r.reduce((a,b)=>a+b,0)/dp1r.length).toFixed(1):null;
         const totDP1r=dp1r.length?dp1r.reduce((a,b)=>a+b,0):null;
+        const hoyosNC=(()=>{const hn=getHoles(r);const inc=[];for(let h=1;h<=hn;h++){const hd=(r.holes||{})[h]||{};if(!parseInt(hd.shots))continue;const par=parseInt(hd.par);const tg=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];let bad=false;if(par>=4&&tg.length===0)bad=true;tg.forEach((t,i)=>{if(!t.palo||!t.resultado)bad=true;if(["corto","largo","lateral"].includes(t.resultado)&&!tg[i+1])bad=true;if(t.resultado==="chip"&&!(parseInt(hd.chips)>0))bad=true;if(t.resultado==="bunker"&&!(parseInt(hd.bunker)>0))bad=true;});if(bad)inc.push(h);}return inc;})();
         return(
           <div key={r.id} style={{...S.card,cursor:"pointer"}} onClick={()=>setSelected(r)}>
+            {hoyosNC.length>0&&<div style={{fontSize:"10px",color:"#c07820",background:"#2a1a08",border:"1px solid #5a3010",borderRadius:"4px",padding:"4px 8px",marginBottom:"8px"}}>⚠️ Datos incompletos en hoyos: {hoyosNC.join(", ")}</div>}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
               <div>
                 <div style={{color:"#f5ead0",fontWeight:"bold",marginBottom:"3px"}}>{getName(r)}</div>
@@ -2167,7 +2199,19 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
   function hoyosIncompletos(jugIdx){
     const j=clase.jugadores[jugIdx];
     if(!j)return [];
-    return Array.from({length:clase.numHoles},(_,i)=>i+1).filter(h=>!isHoyoCompleto(j.holes[h]||{}));
+    return Array.from({length:clase.numHoles},(_,i)=>i+1).filter(h=>{
+      const hd=j.holes[h]||{};
+      if(!isHoyoCompleto(hd))return true;
+      // Validaciones adicionales chip/bunker/corto/largo/lateral
+      const tirosG=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];
+      for(let i=0;i<tirosG.length;i++){
+        const t=tirosG[i];
+        if(["corto","largo","lateral"].includes(t.resultado)&&!tirosG[i+1])return true;
+        if(t.resultado==="chip"&&!(parseInt(hd.chips)>0))return true;
+        if(t.resultado==="bunker"&&!(parseInt(hd.bunker)>0))return true;
+      }
+      return false;
+    });
   }
 
   function finalizar(){
@@ -2386,6 +2430,24 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
                           <option value="largo">❌ Largo</option>
                           <option value="lateral">❌ Lateral</option>
                         </select>
+                        {/* Aviso: corto/largo/lateral → necesita otro tiro */}
+                        {["corto","largo","lateral"].includes(t.resultado)&&!tirosG[i+1]&&(
+                          <div style={{marginTop:"5px",fontSize:"11px",color:L?"#b06020":"#e09040",background:L?"#fdf0e0":"#2a1a08",border:`1px solid ${L?"#e0a060":"#6a4020"}`,borderRadius:"4px",padding:"5px 8px"}}>
+                            ⚠️ Tiro {i+1} quedó {t.resultado} — agregá el siguiente tiro al green
+                          </div>
+                        )}
+                        {/* Aviso: chip resultado → contador chip debe ser > 0 */}
+                        {t.resultado==="chip"&&!(parseInt(hd.chips)>0)&&(
+                          <div style={{marginTop:"5px",fontSize:"11px",color:L?"#b06020":"#e09040",background:L?"#fdf0e0":"#2a1a08",border:`1px solid ${L?"#e0a060":"#6a4020"}`,borderRadius:"4px",padding:"5px 8px"}}>
+                            ⚠️ Marcaste zona chip — completá el contador de chips
+                          </div>
+                        )}
+                        {/* Aviso: bunker resultado → contador bunker debe ser > 0 */}
+                        {t.resultado==="bunker"&&!(parseInt(hd.bunker)>0)&&(
+                          <div style={{marginTop:"5px",fontSize:"11px",color:L?"#b06020":"#e09040",background:L?"#fdf0e0":"#2a1a08",border:`1px solid ${L?"#e0a060":"#6a4020"}`,borderRadius:"4px",padding:"5px 8px"}}>
+                            ⚠️ Marcaste bunker — completá el contador de búnker
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -2662,7 +2724,7 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.chips||"—"}</td>
         <td style="border:1px solid #ddd;padding:6px;text-align:center">${h.bunker||"—"}</td>
         <td style="border:1px solid #ddd;padding:6px;text-align:center;color:${penH>0?"#c04040":"#999"}">${penStr||"—"}</td>
-        <td style="border:1px solid #ddd;padding:6px;text-align:center;font-size:11px">${Array.isArray(h.tirosGreen)&&h.tirosGreen.length?h.tirosGreen.map((t,ti)=>`${ti+1}°: ${t.dist||"—"}y${t.palo?` [${t.palo}]`:""}${t.resultado?` (${t.resultado})`:""}`.trim()).join(" | "):(h.distGreen||"—")}</td>
+        <td style="border:1px solid #ddd;padding:6px;text-align:center;font-size:11px">${Array.isArray(h.tirosGreen)&&h.tirosGreen.length?h.tirosGreen.map((t,ti)=>{const esG=t.resultado==="green";const col=esG?"#2a7a2a":t.resultado&&t.resultado!=="green"?"#c04040":"#555";const sym=t.resultado==="green"?"✓":t.resultado&&t.resultado!=="green"?"✗":"";return '<span style="color:'+col+';font-weight:bold">'+(ti+1)+'° '+(sym?sym+' ':'')+((t.dist||'—')+'y')+(t.palo?' ['+t.palo+']':'')+(t.resultado?' ('+t.resultado+')':'')+'</span>';}).join(" | "):(h.distGreen||"—")}</td>
         <td style="border:1px solid #ddd;padding:6px;font-size:11px;color:#555">${notaLibre||"—"}</td>
       </tr>`;
     }).join("");
@@ -2731,6 +2793,40 @@ function ReporteClase({clase,onBack,onUpdate,lightMode,setLightMode,readOnly}){
       :"";
     const planHTML=(hayPlan||hayDev)?planZonasHTML+estrategiaHTML+reflexionFinalHTML:"";
 
+    // Tarjeta de la cancha resumen para el informe
+    const holeNums2=Array.from({length:clase.numHoles},(_,i)=>i+1);
+    const thStyle='background:#1a1612;color:#C9A84C;padding:5px 4px;text-align:center;border:1px solid #ddd;font-size:10px;letter-spacing:0.5px';
+    const tdCtr='border:1px solid #ddd;padding:5px 4px;text-align:center;font-size:11px';
+    const tarjetaThRow='<tr><th style="'+thStyle+';text-align:left">Dato</th>'
+      +holeNums2.map(h=>'<th style="'+thStyle+'">'+h+'</th>').join('')
+      +'<th style="'+thStyle+'">Total</th></tr>';
+    const parRow='<tr><td style="'+tdCtr+';text-align:left;font-weight:bold;color:#6a4a1a">Par</td>'
+      +holeNums2.map(h=>'<td style="'+tdCtr+'">'+(j.holes[h]&&j.holes[h].par?j.holes[h].par:'—')+'</td>').join('')
+      +'<td style="'+tdCtr+';font-weight:bold">—</td></tr>';
+    const golpesRow='<tr><td style="'+tdCtr+';text-align:left;font-weight:bold;color:#1a1612">Golpes</td>'
+      +holeNums2.map(h=>{const s=parseInt((j.holes[h]||{}).shots)||0;const p=parseInt((j.holes[h]||{}).par)||0;const diff=s&&p?s-p:null;const col=diff===null?'#555':diff<0?'#2a7a2a':diff===0?'#5a3a10':'#c04040';return '<td style="'+tdCtr+';font-weight:bold;color:'+col+'">'+(s||'—')+'</td>';}).join('')
+      +'<td style="'+tdCtr+';font-weight:bold;color:#1a1612">'+(total||'—')+'</td></tr>';
+    const puttsRow='<tr><td style="'+tdCtr+';text-align:left;color:#555">Putts</td>'
+      +holeNums2.map(h=>{const v=parseInt((j.holes[h]||{}).putts)||0;const col=v>=3?'#c04040':v===1?'#2a7a2a':'#555';return '<td style="'+tdCtr+';color:'+col+'">'+(v||'—')+'</td>';}).join('')
+      +'<td style="'+tdCtr+';color:#555">'+(putts||'—')+'</td></tr>';
+    const totChips2=holeNums2.reduce((s,h)=>s+(parseInt((j.holes[h]||{}).chips)||0),0);
+    const totBunker2=holeNums2.reduce((s,h)=>s+(parseInt((j.holes[h]||{}).bunker)||0),0);
+    const chipsRow=totChips2>0?('<tr><td style="'+tdCtr+';text-align:left;color:#555">Chips</td>'
+      +holeNums2.map(h=>{const v=parseInt((j.holes[h]||{}).chips)||0;return '<td style="'+tdCtr+'">'+(v||'—')+'</td>';}).join('')
+      +'<td style="'+tdCtr+'">'+totChips2+'</td></tr>'):'';
+    const bunkerRow=totBunker2>0?('<tr><td style="'+tdCtr+';text-align:left;color:#555">B\xFAnker</td>'
+      +holeNums2.map(h=>{const v=parseInt((j.holes[h]||{}).bunker)||0;return '<td style="'+tdCtr+'">'+(v||'—')+'</td>';}).join('')
+      +'<td style="'+tdCtr+'">'+totBunker2+'</td></tr>'):'';
+    const gapiRow='<tr><td style="'+tdCtr+';text-align:left;color:#555">1\xBA tiro green</td>'
+      +holeNums2.map(h=>{const hd=j.holes[h]||{};if(!parseInt(hd.shots)||!Array.isArray(hd.tirosGreen)||!hd.tirosGreen.length)return '<td style="'+tdCtr+';color:#bbb">—</td>';const t0=hd.tirosGreen[0];const esG=t0.resultado==='green';return '<td style="'+tdCtr+';font-weight:bold;color:'+(esG?'#2a7a2a':'#c04040')+'">'+(esG?'✓':'✗')+'</td>';}).join('')
+      +'<td style="'+tdCtr+'"> </td></tr>';
+    const tarjetaCancha='<h3>Tarjeta de la Cancha</h3>'
+      +'<div style="overflow-x:auto;margin-bottom:16px">'
+      +'<table style="width:100%;border-collapse:collapse;font-size:11px">'
+      +'<thead>'+tarjetaThRow+'</thead>'
+      +'<tbody>'+parRow+golpesRow+puttsRow+chipsRow+bunkerRow+gapiRow+'</tbody>'
+      +'</table></div>';
+
     const hoyo0Block=planHTML?(
       '<div style="background:#1a1612;color:#C9A84C;padding:10px 14px;border-radius:6px 6px 0 0;margin-bottom:0;font-size:13px;font-weight:bold;letter-spacing:1px">&#129504; HOYO 0 &#8212; PLAN MENTAL Y DEVOLUCIÓN</div>'
       +'<div class="card" style="border-radius:0 0 6px 6px;margin-bottom:16px;border-top:none">'+planHTML+'</div>'
@@ -2776,6 +2872,8 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
   <h2>Informe de Clase en Cancha</h2>
 
   ${hoyo0Block}
+
+  ${tarjetaCancha}
 
   <div class="card" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center">
     <div><div style="font-size:11px;color:#b09050;text-transform:uppercase;letter-spacing:1px">Total</div><div style="font-size:26px;font-weight:bold;color:#1a1612">${total||"—"}</div></div>
@@ -3915,8 +4013,11 @@ function ClaseEnCancha(){
                   {clasesAlumno.map(cl=>{
                     const jd=cl.jugadores.find(j=>j.apellido===a.apellido&&j.nombre===a.nombre);
                     const total=jd?Object.values(jd.holes||{}).reduce((s,h)=>s+(parseInt(h.shots)||0),0):0;
+                    const claseIncHoyos=(()=>{if(!jd)return[];const inc=[];for(let h=1;h<=cl.numHoles;h++){const hd=(jd.holes||{})[h]||{};if(!parseInt(hd.shots))continue;const par=parseInt(hd.par);const tg=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];let bad=false;if(par>=4&&tg.length===0)bad=true;tg.forEach((t,i)=>{if(!t.palo||!t.resultado)bad=true;if(["corto","largo","lateral"].includes(t.resultado)&&!tg[i+1])bad=true;if(t.resultado==="chip"&&!(parseInt(hd.chips)>0))bad=true;if(t.resultado==="bunker"&&!(parseInt(hd.bunker)>0))bad=true;});if(bad)inc.push(h);}return inc;})();
                     return(
-                      <div key={cl.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #3a3020"}}>
+                      <div key={cl.id} style={{padding:"8px 0",borderBottom:"1px solid #3a3020"}}>
+                        {claseIncHoyos.length>0&&<div style={{fontSize:"10px",color:"#c07820",background:"#2a1a08",border:"1px solid #5a3010",borderRadius:"4px",padding:"3px 7px",marginBottom:"5px"}}>⚠️ Incompleto en hoyos: {claseIncHoyos.join(", ")}</div>}
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                         <div style={{flex:1,cursor:"pointer"}} onClick={()=>setSelClase(cl)}>
                           <div style={{color:"#f5ead0",fontSize:"12px"}}>{cl.fecha} · {cl.courseName}{cl.configName?` · ${cl.configName}`:""}</div>
                           <div style={{color:"#b09050",fontSize:"10px"}}>{cl.numHoles} hoyos · {cl.jugadores.length} jugador{cl.jugadores.length!==1?"es":""}</div>
@@ -3935,6 +4036,7 @@ function ClaseEnCancha(){
                               </div>
                             )}
                           </div>
+                        </div>
                         </div>
                       </div>
                     );
