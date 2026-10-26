@@ -3654,11 +3654,12 @@ function ClaseEnCancha(){
       if(huerfanas.length>0){
         await Promise.all(huerfanas.map(c=>sbUpsertClase(c)));
       }
-      // 3) Fusionar: remote tiene prioridad absoluta para clases que ya existen allá
-      const map={};
-      local.forEach(c=>{map[c.id]=c;});
-      remote.forEach(c=>{map[c.id]=c;}); // remote sobreescribe local siempre
-      const merged=Object.values(map).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      // 3) Fusionar: remote es la fuente de verdad + huérfanas locales recién subidas
+      //    Las clases eliminadas en otro dispositivo (no están en remote) se descartan
+      const remoteMap={};
+      remote.forEach(c=>{remoteMap[c.id]=c;});
+      huerfanas.forEach(c=>{remoteMap[c.id]=c;}); // agregar las recién subidas
+      const merged=Object.values(remoteMap).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
       lsSet(CLASE_LS,merged);
       setClases(merged);
       // 4) Si la clase activa local fue finalizada en otro dispositivo → limpiar
@@ -3957,6 +3958,24 @@ function ClaseEnCancha(){
     setSyncStatus("ok");
     setMenuClaseId(null);
   }
+  // Elimina solo un jugador de una clase; si era el único, elimina la clase entera
+  async function eliminarJugadorDeClase(claseId, apellido, nombre){
+    const cl=clases.find(c=>c.id===claseId);
+    if(!cl)return;
+    const resto=cl.jugadores.filter(j=>!(j.apellido===apellido&&j.nombre===nombre));
+    if(resto.length===0){
+      // Era el único jugador → eliminar clase completa
+      await eliminarDefinitivo(claseId);
+      return;
+    }
+    if(!window.confirm(`⚠️ Se eliminará la participación de ${nombre} ${apellido} en esta clase.\nSus compañeros no se verán afectados. ¿Continuar?`))return;
+    const claseActualizada={...cl,jugadores:resto};
+    const arr=clases.map(c=>c.id===claseId?claseActualizada:c);
+    setClases(arr);lsSet(CLASE_LS,arr);
+    await sbUpsertClase(claseActualizada);
+    setSyncStatus("ok");
+    setMenuClaseId(null);
+  }
   function desarchivarClase(id){
     const arr=clases.map(c=>c.id===id?{...c,archivada:false}:c);
     saveClases(arr,arr.find(c=>c.id===id));
@@ -4047,7 +4066,7 @@ function ClaseEnCancha(){
                             {menuClaseId===cl.id&&(
                               <div style={{position:"absolute",right:0,top:"100%",marginTop:"4px",background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"6px",zIndex:200,minWidth:"200px",boxShadow:"0 4px 16px rgba(0,0,0,0.7)"}}>
                                 <button onClick={e=>{e.stopPropagation();archivarClase(cl.id);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #3a2e18",color:"#b09050",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>📦 Archivar</button>
-                                <button onClick={e=>{e.stopPropagation();eliminarDefinitivo(cl.id);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",color:"#c04040",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>🗑 Eliminar definitivamente</button>
+                                <button onClick={e=>{e.stopPropagation();eliminarJugadorDeClase(cl.id,a.apellido,a.nombre);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",color:"#c04040",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>🗑 Eliminar definitivamente</button>
                               </div>
                             )}
                           </div>
