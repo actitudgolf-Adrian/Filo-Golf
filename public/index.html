@@ -2172,6 +2172,7 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     rec.start();
   }
   // Determina si un hoyo está completo según criterio estricto
+  // Retorna: false = incompleto (faltan datos base), "error" = datos incongruentes, true = completo
   function isHoyoCompleto(hd){
     if(!hd)return false;
     const shots=parseInt(hd.shots);
@@ -2184,14 +2185,20 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     // Tiro al green: par 3 sin tirosGreen registrados se acepta (se asume tee → green)
     const tirosG=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];
     const hayPenalidad=hd.pen_ob||hd.pen_agua||hd.pen_perdida;
-    const hayChipOBunker=(parseInt(hd.chips)||0)>0||(parseInt(hd.bunker)||0)>0;
     if(par!==3||tirosG.length>0){
-      // Para par 4/5, o par 3 con tiros registrados: el último tiro debe tener palo, dist y resultado
+      // Para par 4/5, o par 3 con tiros registrados: el primer tiro debe tener palo, dist y resultado
       if(tirosG.length===0&&!hayPenalidad&&par!==3)return false;
       if(tirosG.length>0){
         const t0=tirosG[0];
         if(!t0.dist||!t0.palo||!t0.resultado)return false;
       }
+    }
+    // Chequeo de incongruencias → "error" (datos presentes pero inconsistentes)
+    for(let i=0;i<tirosG.length;i++){
+      const t=tirosG[i];
+      if(["corto","largo","lateral"].includes(t.resultado)&&!tirosG[i+1])return "error";
+      if(t.resultado==="chip"&&!(parseInt(hd.chips)>0))return "error";
+      if(t.resultado==="bunker"&&!(parseInt(hd.bunker)>0))return "error";
     }
     return true;
   }
@@ -2201,16 +2208,9 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
     if(!j)return [];
     return Array.from({length:clase.numHoles},(_,i)=>i+1).filter(h=>{
       const hd=j.holes[h]||{};
-      if(!isHoyoCompleto(hd))return true;
-      // Validaciones adicionales chip/bunker/corto/largo/lateral
-      const tirosG=Array.isArray(hd.tirosGreen)?hd.tirosGreen:[];
-      for(let i=0;i<tirosG.length;i++){
-        const t=tirosG[i];
-        if(["corto","largo","lateral"].includes(t.resultado)&&!tirosG[i+1])return true;
-        if(t.resultado==="chip"&&!(parseInt(hd.chips)>0))return true;
-        if(t.resultado==="bunker"&&!(parseInt(hd.bunker)>0))return true;
-      }
-      return false;
+      const res=isHoyoCompleto(hd);
+      // false = incompleto, "error" = datos incongruentes — ambos cuentan como incompleto
+      return res!==true;
     });
   }
 
@@ -2317,11 +2317,13 @@ function ClaseActivaPanel({clase,clases,selJ,setSelJ,selH,setSelH,subTab,setSubT
           {Array.from({length:clase.numHoles},(_,i)=>i+1).map(h=>{
             const hd=j.holes[h]||{};
             const hasShots=!!hd.shots;
-            const completo=isHoyoCompleto(hd);
-            // Verde = completo, amarillo = tiene score pero faltan datos, gris = vacío
-            const bg=selH===h?gold:completo?(L?"#c8e8c8":"#2a3a1a"):hasShots?(L?"#f0e0a0":"#3a3010"):(L?"#e8e0d0":"#1a1612");
-            const col=selH===h?"#1a1612":completo?(L?"#1a5a1a":"#6a9a50"):hasShots?(L?"#7a5a00":"#b0a040"):(L?"#7a5a20":"#b09050");
-            const bdr=selH===h?gold:completo?(L?"#7aba7a":"#3a6a2a"):hasShots?(L?"#c0a020":"#5a4a10"):(L?"#c0a060":"#3a3020");
+            const completoRes=isHoyoCompleto(hd);
+            const completo=completoRes===true;
+            const conError=completoRes==="error";
+            // Verde = completo, rojo = datos incongruentes, amarillo = tiene score pero faltan datos, gris = vacío
+            const bg=selH===h?gold:completo?(L?"#c8e8c8":"#2a3a1a"):conError?(L?"#f0c8c8":"#3a1a1a"):hasShots?(L?"#f0e0a0":"#3a3010"):(L?"#e8e0d0":"#1a1612");
+            const col=selH===h?"#1a1612":completo?(L?"#1a5a1a":"#6a9a50"):conError?(L?"#9a1a1a":"#e05050"):hasShots?(L?"#7a5a00":"#b0a040"):(L?"#7a5a20":"#b09050");
+            const bdr=selH===h?gold:completo?(L?"#7aba7a":"#3a6a2a"):conError?(L?"#e07070":"#6a2a2a"):hasShots?(L?"#c0a020":"#5a4a10"):(L?"#c0a060":"#3a3020");
             return(
               <button key={h} onClick={()=>setSelH(h)} style={{
                 minWidth:"32px",padding:"6px 3px",fontSize:"12px",fontWeight:"bold",
