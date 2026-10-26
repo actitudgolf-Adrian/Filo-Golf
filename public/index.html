@@ -884,12 +884,20 @@ function Auth({onLogin}){
   );
 }
 
-function HoleCard({hole,data,onChange,readonly}){
+function HoleCard({hole,data,onChange,readonly,lightMode}){
   const [open,setOpen]=useState(false);
   const [recStatus,setRecStatus]=useState("idle");
+  const L=lightMode||false;
   const d=data||{shots:"",putts:"",chips:0,bunker:0,tirosGreen:[],par:"",dist:"",hcpIdx:"",distPutt1:"",salida:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
   const updZ=(z,v)=>onChange({...d,zones:{...d.zones,[z]:v}});
+  const HL={
+    card:{background:L?"#f5f0e8":"#1c1810",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"8px",padding:"16px",marginBottom:"14px"},
+    inner:{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"14px",marginBottom:"12px"},
+    inp:{background:L?"#fff9f0":"#2a2318",border:`2px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",color:L?"#1a1200":"#f5ead0",padding:"9px 11px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none"},
+    lbl:{fontSize:"11px",color:L?"#7a5010":"#b09050",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
+    btn:v=>({background:v==="p"?`linear-gradient(135deg,${gold},#a8822a)`:v==="d"?L?"#ffdddd":"#5a1a1a":L?"#e8e0d0":"#2d2720",color:v==="p"?"#1a1612":v==="d"?L?"#c02020":"#f5ead0":L?"#5a3010":"#f5ead0",border:v==="g"?`1px solid ${L?"#c8a84c":"#7a6030"}`:"none",borderRadius:"4px",padding:"9px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold"}),
+  };
   function startVoiceZone(zona){
     if(!navigator.onLine){alert("📶 Sin conexión — el micrófono requiere internet.");return;}
     if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
@@ -899,7 +907,7 @@ function HoleCard({hole,data,onChange,readonly}){
     const rec=new SR();
     rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
     setRecStatus("zone_"+zona);
-    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},10000);
+    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},7000);
     rec.onresult=e=>{
       clearTimeout(timeout);
       const txt=e.results[0][0].transcript;
@@ -918,7 +926,7 @@ function HoleCard({hole,data,onChange,readonly}){
     const rec=new SR();
     rec.lang="es-AR";rec.interimResults=false;rec.maxAlternatives=1;rec.continuous=false;
     setRecStatus("recording");
-    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},10000);
+    const timeout=setTimeout(()=>{try{rec.stop();}catch(e){}setRecStatus("error");setTimeout(()=>setRecStatus("idle"),2000);},7000);
     rec.onresult=e=>{
       clearTimeout(timeout);
       const txt=e.results[0][0].transcript;
@@ -947,98 +955,98 @@ function HoleCard({hole,data,onChange,readonly}){
     upd("tirosGreen",tirosG.filter((_,idx)=>idx!==i));
   }
   return(
-    <div style={{background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"8px",padding:"16px",marginBottom:"14px"}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",paddingBottom:"10px",borderBottom:"1px solid #5a4a20"}}>
+    <div style={HL.card}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px",paddingBottom:"10px",borderBottom:`1px solid ${L?"#c8a84c":"#5a4a20"}`}}>
         <div style={{color:gold,fontWeight:"bold",fontSize:"22px",letterSpacing:"2px"}}>HOYO {hole}</div>
-        {!readonly&&<button style={{...S.btn("g"),padding:"8px 14px",fontSize:"13px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲ Cerrar":"📝 Notas"}</button>}
+        {!readonly&&<button style={{...HL.btn("g"),padding:"8px 14px",fontSize:"13px"}} onClick={()=>setOpen(o=>!o)}>{open?"▲ Cerrar":"📝 Notas"}</button>}
         {readonly&&hasNotes&&<span style={{fontSize:"18px"}}>📝</span>}
       </div>
       {open&&!readonly&&(
-        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"14px",marginBottom:"12px"}}>
+        <div style={HL.inner}>
           <div style={{fontSize:"10px",color:gold,letterSpacing:"2px",textTransform:"uppercase",marginBottom:"12px"}}>Anotaciones — Hoyo {hole}</div>
-          <label style={S.lbl}>Tiro de salida (opcional)</label>
+          <label style={HL.lbl}>Tiro de salida (opcional)</label>
           <div style={{display:"flex",gap:"8px",marginBottom:"12px"}}>
             {["Fairway","Rough","Penalidad"].map(op=>(
-              <button key={op} style={{...S.btn(d.salida===op?"p":"g"),flex:1,padding:"10px 4px",fontSize:"13px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
+              <button key={op} style={{...HL.btn(d.salida===op?"p":"g"),flex:1,padding:"10px 4px",fontSize:"13px"}} onClick={()=>upd("salida",d.salida===op?"":op)}>{op}</button>
             ))}
           </div>
           {ZONES.map(z=>(
             <div key={z} style={{marginBottom:"10px"}}>
               <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-                <label style={{...S.lbl,marginBottom:0,flex:1}}>{z}</label>
-                {voiceBtn(recStatus,"zone_"+z,()=>startVoiceZone(z),false)}
+                <label style={{...HL.lbl,marginBottom:0,flex:1}}>{z}</label>
+                {voiceBtn(recStatus,"zone_"+z,()=>startVoiceZone(z),L)}
                 {recStatus==="done"&&<span style={{fontSize:"11px",color:"#6abf6a"}}>✓</span>}
                 {recStatus==="error"&&<span style={{fontSize:"11px",color:"#cf6679"}}>✗</span>}
               </div>
-              <input style={S.inp} placeholder="Nota..." value={d.zones?.[z]||""} onChange={e=>updZ(z,e.target.value)}/>
+              <input style={HL.inp} placeholder="Nota..." value={d.zones?.[z]||""} onChange={e=>updZ(z,e.target.value)}/>
             </div>
           ))}
           <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"5px"}}>
-            <label style={{...S.lbl,marginBottom:0,flex:1}}>Anotación libre</label>
-            {voiceBtn(recStatus,"recording",startVoiceNote,false)}
+            <label style={{...HL.lbl,marginBottom:0,flex:1}}>Anotación libre</label>
+            {voiceBtn(recStatus,"recording",startVoiceNote,L)}
             {recStatus==="done"&&<span style={{fontSize:"11px",color:"#6abf6a"}}>✓</span>}
             {recStatus==="error"&&<span style={{fontSize:"11px",color:"#cf6679"}}>✗</span>}
           </div>
-          <textarea style={{...S.inp,minHeight:"60px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
+          <textarea style={{...HL.inp,minHeight:"60px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
         </div>
       )}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"12px",marginBottom:"12px"}}>
-        <div><label style={S.lbl}>Par</label><input style={smInp} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/></div>
-        <div><label style={S.lbl}>Dist (yds)</label><input style={smInp} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/></div>
-        <div><label style={S.lbl}>Índice</label><input style={smInp} type="number" min="1" max="18" placeholder="—" value={d.hcpIdx||""} disabled={readonly} onChange={e=>upd("hcpIdx",e.target.value)}/></div>
+        <div><label style={HL.lbl}>Par</label><input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/></div>
+        <div><label style={HL.lbl}>Dist (yds)</label><input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/></div>
+        <div><label style={HL.lbl}>Índice</label><input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="1" max="18" placeholder="—" value={d.hcpIdx||""} disabled={readonly} onChange={e=>upd("hcpIdx",e.target.value)}/></div>
       </div>
       <div style={{marginBottom:"12px"}}>
-        <label style={S.lbl}>Golpes</label>
-        <input style={bigInp} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
+        <label style={HL.lbl}>Golpes</label>
+        <input style={{...bigInp,...HL.inp,fontSize:"22px",padding:"14px",textAlign:"center",fontWeight:"bold"}} type="number" min="1" max="20" placeholder="—" value={d.shots} disabled={readonly} onChange={e=>upd("shots",e.target.value)}/>
       </div>
       <div style={{marginBottom:"12px"}}>
-        <label style={S.lbl}>Putts</label>
-        <input style={bigInp} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
+        <label style={HL.lbl}>Putts</label>
+        <input style={{...bigInp,...HL.inp,fontSize:"22px",padding:"14px",textAlign:"center",fontWeight:"bold"}} type="number" min="0" max="10" placeholder="—" value={d.putts} disabled={readonly} onChange={e=>upd("putts",e.target.value)}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px",marginBottom:"12px"}}>
         <div>
-          <label style={S.lbl}>Chip</label>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",padding:"8px"}}>
+          <label style={HL.lbl}>Chip</label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:L?"#e8e0d0":"#2a2318",border:`2px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",padding:"8px"}}>
             {!readonly
-              ?<><button style={ctrBtn} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
-                <span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.chips||0}</span>
-                <button style={ctrBtn} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
-              :<span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.chips||0}</span>
+              ?<><button style={{...ctrBtn,...HL.btn("g"),padding:"10px 18px",fontSize:"22px",lineHeight:1,minWidth:"50px"}} onClick={()=>upd("chips",Math.max(0,(parseInt(d.chips)||0)-1))}>−</button>
+                <span style={{color:L?"#1a1200":"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.chips||0}</span>
+                <button style={{...ctrBtn,...HL.btn("g"),padding:"10px 18px",fontSize:"22px",lineHeight:1,minWidth:"50px"}} onClick={()=>upd("chips",(parseInt(d.chips)||0)+1)}>+</button></>
+              :<span style={{color:L?"#1a1200":"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.chips||0}</span>
             }
           </div>
         </div>
         <div>
-          <label style={S.lbl}>Búnker</label>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:"#2a2318",border:"2px solid #7a6030",borderRadius:"4px",padding:"8px"}}>
+          <label style={HL.lbl}>Búnker</label>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",background:L?"#e8e0d0":"#2a2318",border:`2px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",padding:"8px"}}>
             {!readonly
-              ?<><button style={ctrBtn} onClick={()=>upd("bunker",Math.max(0,(parseInt(d.bunker)||0)-1))}>−</button>
-                <span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.bunker||0}</span>
-                <button style={ctrBtn} onClick={()=>upd("bunker",(parseInt(d.bunker)||0)+1)}>+</button></>
-              :<span style={{color:"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.bunker||0}</span>
+              ?<><button style={{...ctrBtn,...HL.btn("g"),padding:"10px 18px",fontSize:"22px",lineHeight:1,minWidth:"50px"}} onClick={()=>upd("bunker",Math.max(0,(parseInt(d.bunker)||0)-1))}>−</button>
+                <span style={{color:L?"#1a1200":"#f5ead0",fontSize:"24px",fontWeight:"bold",minWidth:"32px",textAlign:"center"}}>{d.bunker||0}</span>
+                <button style={{...ctrBtn,...HL.btn("g"),padding:"10px 18px",fontSize:"22px",lineHeight:1,minWidth:"50px"}} onClick={()=>upd("bunker",(parseInt(d.bunker)||0)+1)}>+</button></>
+              :<span style={{color:L?"#1a1200":"#f5ead0",fontSize:"24px",fontWeight:"bold",textAlign:"center",width:"100%"}}>{d.bunker||0}</span>
             }
           </div>
         </div>
       </div>
       <div style={{marginBottom:"12px"}}>
-        <label style={S.lbl}>Tiros al green</label>
+        <label style={HL.lbl}>Tiros al green</label>
         {tirosG.map((t,i)=>(
-          <div key={i} style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"10px",marginBottom:"8px"}}>
+          <div key={i} style={{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"10px",marginBottom:"8px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
               <span style={{color:gold,fontSize:"12px",fontWeight:"bold"}}>Tiro {i+1}</span>
-              {!readonly&&<button style={{...S.btn("d"),padding:"4px 10px",fontSize:"11px"}} onClick={()=>removeTiro(i)}>✕</button>}
+              {!readonly&&<button style={{...HL.btn("d"),padding:"4px 10px",fontSize:"11px"}} onClick={()=>removeTiro(i)}>✕</button>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"8px"}}>
               <div>
-                <label style={S.lbl}>Dist (yds)</label>
-                <input style={smInp} type="number" min="0" max="999" placeholder="—" value={t.dist||""} disabled={readonly} onChange={e=>updTiro(i,"dist",e.target.value)}/>
+                <label style={HL.lbl}>Dist (yds)</label>
+                <input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="0" max="999" placeholder="—" value={t.dist||""} disabled={readonly} onChange={e=>updTiro(i,"dist",e.target.value)}/>
               </div>
               <div>
-                <label style={S.lbl}>Palo</label>
-                <input style={smInp} type="text" placeholder="7H, PW..." value={t.palo||""} disabled={readonly} onChange={e=>updTiro(i,"palo",e.target.value.toUpperCase())}/>
+                <label style={HL.lbl}>Palo</label>
+                <input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="text" placeholder="7H, PW..." value={t.palo||""} disabled={readonly} onChange={e=>updTiro(i,"palo",e.target.value.toUpperCase())}/>
               </div>
             </div>
-            <label style={S.lbl}>Resultado</label>
-            <select value={t.resultado||""} disabled={readonly} onChange={e=>updTiro(i,"resultado",e.target.value)} style={{...S.inp,fontSize:"14px"}}>
+            <label style={HL.lbl}>Resultado</label>
+            <select value={t.resultado||""} disabled={readonly} onChange={e=>updTiro(i,"resultado",e.target.value)} style={{...HL.inp,fontSize:"14px"}}>
               <option value="">—</option>
               <option value="green">🟢 Green</option>
               <option value="chip">🟡 Zona chip</option>
@@ -1050,22 +1058,22 @@ function HoleCard({hole,data,onChange,readonly}){
           </div>
         ))}
         {!readonly&&!greenCerrado&&(
-          <button style={{...S.btn("g"),width:"100%",padding:"10px",fontSize:"13px"}} onClick={addTiro}>+ Agregar tiro al green</button>
+          <button style={{...HL.btn("g"),width:"100%",padding:"10px",fontSize:"13px"}} onClick={addTiro}>+ Agregar tiro al green</button>
         )}
-        {readonly&&tirosG.length===0&&<div style={{color:"#b09050",fontSize:"11px",fontStyle:"italic"}}>{parseInt(d.par)===3?"Tiro directo (par 3)":"Sin tiros registrados"}</div>}
+        {readonly&&tirosG.length===0&&<div style={{color:L?"#7a5010":"#b09050",fontSize:"11px",fontStyle:"italic"}}>{parseInt(d.par)===3?"Tiro directo (par 3)":"Sin tiros registrados"}</div>}
       </div>
       {(parseInt(d.putts)||0)>0&&(
         <div style={{marginBottom:"10px"}}>
-          <label style={S.lbl}>Dist. primer putt (yds)</label>
-          <input style={smInp} type="number" min="0" max="99" placeholder="—" value={d.distPutt1||""} disabled={readonly} onChange={e=>upd("distPutt1",e.target.value)}/>
+          <label style={HL.lbl}>Dist. primer putt (yds)</label>
+          <input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="0" max="99" placeholder="—" value={d.distPutt1||""} disabled={readonly} onChange={e=>upd("distPutt1",e.target.value)}/>
         </div>
       )}
 
       {readonly&&hasNotes&&(
-        <div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px",marginTop:"10px"}}>
-          {d.salida&&<div style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>Salida: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.salida}</span></div>}
-          {ZONES.map(z=>d.zones?.[z]&&(<div key={z} style={{marginBottom:"6px"}}><span style={{color:"#b09050",fontSize:"11px"}}>{z}: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.zones[z]}</span></div>))}
-          {d.note&&<div><span style={{color:"#b09050",fontSize:"11px"}}>Libre: </span><span style={{color:"#f5ead0",fontSize:"13px"}}>{d.note}</span></div>}
+        <div style={{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"12px",marginTop:"10px"}}>
+          {d.salida&&<div style={{marginBottom:"6px"}}><span style={{color:L?"#7a5010":"#b09050",fontSize:"11px"}}>Salida: </span><span style={{color:L?"#1a1200":"#f5ead0",fontSize:"13px"}}>{d.salida}</span></div>}
+          {ZONES.map(z=>d.zones?.[z]&&(<div key={z} style={{marginBottom:"6px"}}><span style={{color:L?"#7a5010":"#b09050",fontSize:"11px"}}>{z}: </span><span style={{color:L?"#1a1200":"#f5ead0",fontSize:"13px"}}>{d.zones[z]}</span></div>))}
+          {d.note&&<div><span style={{color:L?"#7a5010":"#b09050",fontSize:"11px"}}>Libre: </span><span style={{color:L?"#1a1200":"#f5ead0",fontSize:"13px"}}>{d.note}</span></div>}
         </div>
       )}
     </div>
@@ -1092,6 +1100,9 @@ function NewRound({user,onSave,onCancel,editRound}){
   const [plan0,setPlan0]=useState(()=>editRound?.plan0||existingDraft?.plan0||{});
   const [showPlan0,setShowPlan0]=useState(false);
   const [recPlan,setRecPlan]=useState("idle");
+  const [lightMode,setLightMode]=useState(()=>lsGet("player:lightMode")||false);
+  const L=lightMode;
+  function toggleLight(){const v=!lightMode;setLightMode(v);lsSet("player:lightMode",v);}
 
   // Auto-save draft on every change
   useEffect(()=>{
@@ -1268,15 +1279,16 @@ function NewRound({user,onSave,onCancel,editRound}){
         </div>
       )}
       {step===2&&(
-        <div style={S.card}>
+        <div style={{...S.card,background:L?"#f5f0e8":"#1c1810",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"12px",flexWrap:"wrap",gap:"6px"}}>
             <div>
               <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>{course?.name}</div>
-              <div style={{color:"#b09050",fontSize:"11px"}}>{meta.date} · {meta.format} · HCP {meta.hcp}</div>
+              <div style={{color:L?"#7a5010":"#b09050",fontSize:"11px"}}>{meta.date} · {meta.format} · HCP {meta.hcp}</div>
             </div>
-            <div style={{textAlign:"right"}}>
-              <div style={{color:gold,fontSize:"24px",fontWeight:"bold"}}>{totalShots||"—"}</div>
-              <div style={{color:"#b09050",fontSize:"10px"}}>{totalPutts} putts · {totalChips} chips · {totalBunker} búnker</div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:"6px"}}>
+              <button onClick={toggleLight} style={{background:L?"#2d2720":"#e8e0d0",color:L?"#f5ead0":"#5a3010",border:`1px solid ${L?"#7a6030":"#c8a84c"}`,borderRadius:"4px",padding:"5px 10px",fontSize:"11px",cursor:"pointer"}}>{L?"🌙 Oscuro":"☀️ Claro"}</button>
+              <div style={{color:gold,fontSize:"24px",fontWeight:"bold",textAlign:"right"}}>{totalShots||"—"}</div>
+              <div style={{color:L?"#7a5010":"#b09050",fontSize:"10px"}}>{totalPutts} putts · {totalChips} chips · {totalBunker} búnker</div>
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"14px"}}>
@@ -1286,13 +1298,13 @@ function NewRound({user,onSave,onCancel,editRound}){
           {err&&<div style={S.alt("e")}>{err}</div>}
 
           {/* Hoyo 0 — Plan de juego pre-ronda */}
-          <div style={{background:"#141210",border:`1px solid ${showPlan0?"#9a7030":"#5a4a20"}`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
+          <div style={{background:L?"#ede8dc":"#141210",border:`1px solid ${showPlan0?gold:L?"#c8a84c":"#5a4a20"}`,borderRadius:"8px",padding:"14px",marginBottom:"14px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div>
                 <div style={{color:gold,fontWeight:"bold",fontSize:"15px",letterSpacing:"1px"}}>HOYO 0 — Plan Pre-Ronda</div>
-                <div style={{color:"#b09050",fontSize:"11px"}}>Calentamiento y estrategia antes de salir</div>
+                <div style={{color:L?"#7a5010":"#b09050",fontSize:"11px"}}>Calentamiento y estrategia antes de salir</div>
               </div>
-              <button style={{...S.btn("g"),padding:"7px 12px",fontSize:"12px"}} onClick={()=>setShowPlan0(o=>!o)}>
+              <button style={{background:L?"#e8e0d0":"#2d2720",color:L?"#5a3010":"#f5ead0",border:`1px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",padding:"7px 12px",fontSize:"12px",cursor:"pointer",fontWeight:"bold"}} onClick={()=>setShowPlan0(o=>!o)}>
                 {showPlan0?"▲ Cerrar":"📋 Abrir"}
               </button>
             </div>
@@ -1301,20 +1313,20 @@ function NewRound({user,onSave,onCancel,editRound}){
                 {ZONES.map((z,zi)=>(
                   <div key={z} style={{marginBottom:"12px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-                      <label style={{...S.lbl,marginBottom:0,flex:1}}>{z}</label>
-                      {voiceBtn(recPlan,"plan_z"+zi,()=>startVoicePlan("zona_"+zi),false)}
+                      <label style={{fontSize:"11px",color:L?"#7a5010":"#b09050",letterSpacing:"1px",textTransform:"uppercase",marginBottom:0,flex:1}}>{z}</label>
+                      {voiceBtn(recPlan,"plan_z"+zi,()=>startVoicePlan("zona_"+zi),L)}
                     </div>
-                    <textarea style={{...S.inp,minHeight:"52px",resize:"vertical"}}
+                    <textarea style={{background:L?"#fff9f0":"#2a2318",border:`2px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",color:L?"#1a1200":"#f5ead0",padding:"9px 11px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none",minHeight:"52px",resize:"vertical"}}
                       placeholder={`Plan para ${z.toLowerCase()}...`}
                       value={plan0["zona_"+zi]||""} onChange={e=>setPlan0(p=>({...p,["zona_"+zi]:e.target.value}))}/>
                   </div>
                 ))}
                 <div style={{marginBottom:"4px"}}>
                   <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"4px"}}>
-                    <label style={{...S.lbl,marginBottom:0,flex:1}}>Estrategia global</label>
-                    {voiceBtn(recPlan,"plan_eg",()=>startVoicePlan("estrategiaGlobal"),false)}
+                    <label style={{fontSize:"11px",color:L?"#7a5010":"#b09050",letterSpacing:"1px",textTransform:"uppercase",marginBottom:0,flex:1}}>Estrategia global</label>
+                    {voiceBtn(recPlan,"plan_eg",()=>startVoicePlan("estrategiaGlobal"),L)}
                   </div>
-                  <textarea style={{...S.inp,minHeight:"60px",resize:"vertical"}}
+                  <textarea style={{background:L?"#fff9f0":"#2a2318",border:`2px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",color:L?"#1a1200":"#f5ead0",padding:"9px 11px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none",minHeight:"60px",resize:"vertical"}}
                     placeholder="Mi estrategia general para hoy..."
                     value={plan0.estrategiaGlobal||""} onChange={e=>setPlan0(p=>({...p,estrategiaGlobal:e.target.value}))}/>
                 </div>
@@ -1323,21 +1335,21 @@ function NewRound({user,onSave,onCancel,editRound}){
           </div>
 
           {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
-            <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false}/>
+            <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false} lightMode={lightMode}/>
           ))}
-          <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderTop:"2px solid #7a6030",marginTop:"6px"}}>
-            <div style={{color:"#b09050",fontSize:"12px"}}>Putts: <span style={{color:"#f5ead0"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:"#f5ead0"}}>{totalChips}</span> · Búnker: <span style={{color:"#f5ead0"}}>{totalBunker}</span></div>
+          <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderTop:`2px solid ${L?"#c8a84c":"#7a6030"}`,marginTop:"6px"}}>
+            <div style={{color:L?"#7a5010":"#b09050",fontSize:"12px"}}>Putts: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalChips}</span> · Búnker: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalBunker}</span></div>
             <div style={{color:gold,fontSize:"14px",fontWeight:"bold"}}>Total: {totalShots||"—"}</div>
           </div>
           {hasDist&&(
             <div style={{marginTop:"10px"}}>
               {!showSaveCfg
-                ?<button style={{...S.btn("g"),width:"100%",padding:"10px"}} onClick={()=>{setShowSaveCfg(true);setCfgName(course?.name||"");}}>💾 Guardar configuración de cancha</button>
-                :<div style={{background:"#141210",border:"1px solid #5a4a20",borderRadius:"6px",padding:"12px"}}>
-                  <label style={S.lbl}>Nombre de la configuración</label>
-                  <input style={{...S.inp,marginBottom:"8px"}} placeholder="Ej: Cañuelas Roja, Hurlingham Azul..." value={cfgName} onChange={e=>setCfgName(e.target.value)}/>
+                ?<button style={{background:L?"#e8e0d0":"#2d2720",color:L?"#5a3010":"#f5ead0",border:`1px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",padding:"10px",fontSize:"13px",cursor:"pointer",fontWeight:"bold",width:"100%"}} onClick={()=>{setShowSaveCfg(true);setCfgName(course?.name||"");}}>💾 Guardar configuración de cancha</button>
+                :<div style={{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"12px"}}>
+                  <label style={{fontSize:"11px",color:L?"#7a5010":"#b09050",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"}}>Nombre de la configuración</label>
+                  <input style={{background:L?"#fff9f0":"#2a2318",border:`2px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",color:L?"#1a1200":"#f5ead0",padding:"9px 11px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none",marginBottom:"8px"}} placeholder="Ej: Cañuelas Roja, Hurlingham Azul..." value={cfgName} onChange={e=>setCfgName(e.target.value)}/>
                   <div style={{display:"flex",gap:"8px"}}>
-                    <button style={S.btn("g")} onClick={()=>setShowSaveCfg(false)}>Cancelar</button>
+                    <button style={{background:L?"#e8e0d0":"#2d2720",color:L?"#5a3010":"#f5ead0",border:`1px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",padding:"9px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold"}} onClick={()=>setShowSaveCfg(false)}>Cancelar</button>
                     <button style={{...S.btn("p"),flex:1}} onClick={saveConfig}>Guardar</button>
                   </div>
                 </div>
@@ -1345,7 +1357,7 @@ function NewRound({user,onSave,onCancel,editRound}){
             </div>
           )}
           <div style={{display:"flex",gap:"8px",marginTop:"12px"}}>
-            <button style={S.btn("g")} onClick={()=>setStep(1)}>← Atrás</button>
+            <button style={{background:L?"#e8e0d0":"#2d2720",color:L?"#5a3010":"#f5ead0",border:`1px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",padding:"9px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold"}} onClick={()=>setStep(1)}>← Atrás</button>
             <button style={{...S.btn("p"),flex:1,padding:"11px"}} onClick={save} disabled={saving}>{saving?"Guardando...":"Guardar vuelta ✓"}</button>
           </div>
         </div>
