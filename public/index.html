@@ -3430,7 +3430,8 @@ async function sbLoadClases(){
     const r=await fetch(SB_URL+"/rest/v1/clases?coach_username=eq.coach&order=created_at.desc",{headers:H});
     if(!r.ok)return null;
     const rows=await r.json();
-    return rows.map(row=>row.data).filter(Boolean);
+    // Filtrar clases marcadas como deleted (eliminadas desde otro dispositivo)
+    return rows.map(row=>row.data).filter(d=>d&&!d.deleted);
   }catch{return null;}
 }
 // ────────────────────────────────────────────────────────────────────────────
@@ -3645,12 +3646,16 @@ function ClaseEnCancha(){
       setSyncStatus("syncing");
       const local=lsGet(CLASE_LS)||[];
       // 1) Bajar todo desde Supabase primero — remote es la fuente de verdad
-      const remote=await sbLoadClases();
+      const remote=await sbLoadClases(); // ya filtra deleted:true
       if(!remote){setSyncStatus("err");return;}
-      const remoteIds=new Set(remote.map(c=>c.id));
-      // 2) Subir SOLO las clases locales que no existen en Supabase (huérfanas reales)
-      //    Nunca pisar una clase remota con la versión local — evita sobreescribir finalizada:true
-      const huerfanas=local.filter(c=>!remoteIds.has(c.id));
+      // Obtener TODOS los IDs remotos (incluyendo deleted) para no re-subir eliminadas
+      let allRemoteIds=new Set(remote.map(c=>c.id));
+      try{
+        const rids=await fetch(SB_URL+"/rest/v1/clases?coach_username=eq.coach&select=id",{headers:H});
+        if(rids.ok){const rows=await rids.json();rows.forEach(r=>{if(r.id)allRemoteIds.add(r.id);});}
+      }catch{}
+      // 2) Subir SOLO clases locales que no existen en absoluto en Supabase (ni como deleted)
+      const huerfanas=local.filter(c=>!allRemoteIds.has(c.id)&&!c.deleted);
       if(huerfanas.length>0){
         await Promise.all(huerfanas.map(c=>sbUpsertClase(c)));
       }
@@ -3662,11 +3667,12 @@ function ClaseEnCancha(){
       const merged=Object.values(remoteMap).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
       lsSet(CLASE_LS,merged);
       setClases(merged);
-      // 4) Si la clase activa local fue finalizada en otro dispositivo → limpiar
+      // 4) Si la clase activa local fue finalizada o eliminada en otro dispositivo → limpiar
       const activeLocal=lsGet(CLASE_ACTIVE_LS);
       if(activeLocal&&activeLocal.id){
         const remoteVersion=merged.find(c=>c.id===activeLocal.id);
-        if(remoteVersion&&remoteVersion.finalizada){
+        // Limpiar si: fue finalizada en otro dispositivo, o fue eliminada (no existe en merged)
+        if((remoteVersion&&remoteVersion.finalizada)||(!remoteVersion&&allRemoteIds.has(activeLocal.id))){
           lsSet(CLASE_ACTIVE_LS,null);
           setCur(null);
           setPhase("list");
@@ -3954,7 +3960,15 @@ function ClaseEnCancha(){
     const arr=clases.filter(c=>c.id!==id);
     setClases(arr);lsSet(CLASE_LS,arr);
     if(cur&&cur.id===id){setCurPersist(null);setCur(null);}
-    try{await fetch(SB_URL+"/rest/v1/clases?id=eq."+id,{method:"DELETE",headers:H});}catch{}
+    // Marcar como deleted en Supabase (no hacer DELETE real) — así otros dispositivos
+    // saben que fue eliminada intencionalmente y no la vuelven a subir como huérfana
+    try{
+      await fetch(SB_URL+"/rest/v1/clases",{
+        method:"POST",
+        headers:{...H,"Prefer":"resolution=merge-duplicates"},
+        body:JSON.stringify({id,coach_username:"coach",fecha:"",data:{id,deleted:true},finalizada:true,created_at:0})
+      });
+    }catch{}
     setSyncStatus("ok");
     setMenuClaseId(null);
   }
