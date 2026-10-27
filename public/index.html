@@ -4076,8 +4076,8 @@ function ClaseEnCancha(){
                           <div style={{color:"#b09050",fontSize:"10px",cursor:"pointer"}} onClick={()=>setSelClase(cl)}>Ver →</div>
                           <button onClick={()=>crearCopiaEditable(cl)} style={{background:"none",border:"1px solid #4a7a30",borderRadius:"4px",color:"#7ab050",cursor:"pointer",fontSize:"10px",padding:"3px 7px"}}>✏️ Modificar</button>
                           <div style={{position:"relative",zIndex:100}}>
-                            <button onClick={e=>{e.stopPropagation();setMenuClaseId(menuClaseId===cl.id?null:cl.id);}} style={{background:"none",border:"1px solid #5a4a20",borderRadius:"4px",color:"#b09050",cursor:"pointer",fontSize:"12px",padding:"3px 9px",fontWeight:"bold"}}>⋯</button>
-                            {menuClaseId===cl.id&&(
+                            <button onClick={e=>{e.stopPropagation();const k=cl.id+"|"+a.apellido;setMenuClaseId(menuClaseId===k?null:k);}} style={{background:"none",border:"1px solid #5a4a20",borderRadius:"4px",color:"#b09050",cursor:"pointer",fontSize:"12px",padding:"3px 9px",fontWeight:"bold"}}>⋯</button>
+                            {menuClaseId===cl.id+"|"+a.apellido&&(
                               <div style={{position:"absolute",right:0,top:"100%",marginTop:"4px",background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"6px",zIndex:200,minWidth:"200px",boxShadow:"0 4px 16px rgba(0,0,0,0.7)"}}>
                                 <button onClick={e=>{e.stopPropagation();archivarClase(cl.id);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #3a2e18",color:"#b09050",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>📦 Archivar</button>
                                 <button onClick={e=>{e.stopPropagation();eliminarJugadorDeClase(cl.id,a.apellido,a.nombre);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",color:"#c04040",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>🗑 Eliminar definitivamente</button>
