@@ -3949,10 +3949,25 @@ function ClaseEnCancha(){
     setClaseEditando(null);
   }
 
-  function archivarClase(id){
-    const arr=clases.map(c=>c.id===id?{...c,archivada:true}:c);
-    saveClases(arr,arr.find(c=>c.id===id));
-    if(cur&&cur.id===id){setCurPersist(null);setCur(null);}
+  async function archivarJugadorDeClase(claseId,apellido,nombre){
+    const cl=clases.find(c=>c.id===claseId);
+    if(!cl)return;
+    const resto=cl.jugadores.filter(j=>!(j.apellido===apellido&&j.nombre===nombre));
+    if(resto.length===0){
+      // Único jugador → archivar la clase completa
+      if(!window.confirm("¿Archivar esta clase?"))return;
+      const arr=clases.map(c=>c.id===claseId?{...c,archivada:true}:c);
+      saveClases(arr,arr.find(c=>c.id===claseId));
+      if(cur&&cur.id===claseId){setCurPersist(null);setCur(null);}
+    }else{
+      // Hay compañeros → solo quitar al jugador seleccionado
+      if(!window.confirm("Se archivará la participación de "+nombre+" "+apellido+" en esta clase.\nSus compañeros no se verán afectados. ¿Continuar?"))return;
+      const claseActualizada={...cl,jugadores:resto};
+      const arr=clases.map(c=>c.id===claseId?claseActualizada:c);
+      setClases(arr);lsSet(CLASE_LS,arr);
+      await sbUpsertClase(claseActualizada);
+      setSyncStatus("ok");
+    }
     setMenuClaseId(null);
   }
   async function eliminarDefinitivo(id){
@@ -4079,7 +4094,7 @@ function ClaseEnCancha(){
                             <button onClick={e=>{e.stopPropagation();const k=cl.id+"|"+a.apellido+"|"+a.nombre+"|"+ci;setMenuClaseId(menuClaseId===k?null:k);}} style={{background:"none",border:"1px solid #5a4a20",borderRadius:"4px",color:"#b09050",cursor:"pointer",fontSize:"12px",padding:"3px 9px",fontWeight:"bold"}}>⋯</button>
                             {menuClaseId===cl.id+"|"+a.apellido+"|"+a.nombre+"|"+ci&&(
                               <div style={{position:"absolute",right:0,top:"100%",marginTop:"4px",background:"#1c1810",border:"1px solid #5a4a20",borderRadius:"6px",zIndex:200,minWidth:"200px",boxShadow:"0 4px 16px rgba(0,0,0,0.7)"}}>
-                                <button onClick={e=>{e.stopPropagation();archivarClase(cl.id);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #3a2e18",color:"#b09050",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>📦 Archivar</button>
+                                <button onClick={e=>{e.stopPropagation();archivarJugadorDeClase(cl.id,a.apellido,a.nombre);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",borderBottom:"1px solid #3a2e18",color:"#b09050",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>📦 Archivar</button>
                                 <button onClick={e=>{e.stopPropagation();eliminarJugadorDeClase(cl.id,a.apellido,a.nombre);}} style={{display:"block",width:"100%",padding:"10px 14px",background:"none",border:"none",color:"#c04040",cursor:"pointer",fontSize:"12px",textAlign:"left"}}>🗑 Eliminar definitivamente</button>
                               </div>
                             )}
