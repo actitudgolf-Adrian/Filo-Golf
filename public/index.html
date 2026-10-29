@@ -1129,6 +1129,7 @@ function NewRound({user,onSave,onCancel,editRound}){
   const [cfgName,setCfgName]=useState("");
   const [showDraftBanner,setShowDraftBanner]=useState(()=>!!existingDraft);
   const [plan0,setPlan0]=useState(()=>editRound?.plan0||existingDraft?.plan0||{});
+  const [selectedHoles,setSelectedHoles]=useState([]);
   const [showPlan0,setShowPlan0]=useState(false);
   const [recPlan,setRecPlan]=useState("idle");
   const [lightMode,setLightMode]=useState(()=>lsGet("player:lightMode")||false);
@@ -1331,10 +1332,71 @@ function NewRound({user,onSave,onCancel,editRound}){
             if(!meta.format){setErr("Elegí el formato de juego.");return}
             if(!meta.tipo){setErr("Elegí el tipo de vuelta: Práctica o Competitiva.");return}
             if(meta.hcp===""||meta.hcp===null){setErr("Ingresá tu handicap de hoy.");return}
-            setErr("");setStep(2);
+            setErr("");
+            const course=COURSES[meta.courseId];
+            const totalHoyos=course?Object.keys(course.holes||{}).length:parseInt(meta.numHoles);
+            if(parseInt(meta.numHoles)<totalHoyos){
+              setSelectedHoles([]);setStep(1.5);
+            }else{
+              setStep(2);
+            }
           }}>Ir a la tarjeta →</button>
         </div>
       )}
+      {step===1.5&&(()=>{
+        const course=COURSES[meta.courseId];
+        const allHoles=course?Object.keys(course.holes||{}).sort((a,b)=>parseInt(a)-parseInt(b)):[];
+        const numNeed=parseInt(meta.numHoles);
+        const toggle=h=>{
+          setSelectedHoles(prev=>{
+            if(prev.includes(h))return prev.filter(x=>x!==h);
+            if(prev.length>=numNeed)return prev;
+            return [...prev,h];
+          });
+        };
+        const confirmar=()=>{
+          if(selectedHoles.length!==numNeed){setErr("Seleccioná exactamente "+numNeed+" hoyo"+(numNeed===1?"":"s")+".");return;}
+          // Armar holes solo con los seleccionados, con datos de la cancha
+          const newH={};
+          selectedHoles.forEach(h=>{
+            const d=course?.holes?.[h]||{};
+            newH[h]={par:d.par||"",dist:d.dist||"",hcpIdx:d.hcpIdx||"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:""};
+          });
+          setHoles(newH);setErr("");setStep(2);
+        };
+        return(
+          <div style={S.card}>
+            <div style={{color:gold,fontSize:"13px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"4px"}}>¿Qué hoyos vas a jugar?</div>
+            <div style={{color:"#b09050",fontSize:"12px",marginBottom:"16px"}}>Seleccioná {numNeed} hoyo{numNeed===1?"":"s"} · {selectedHoles.length}/{numNeed} elegidos</div>
+            {err&&<div style={{...S.alt("e"),marginBottom:"10px"}}>{err}</div>}
+            <div style={{display:"flex",flexWrap:"wrap",gap:"8px",marginBottom:"18px"}}>
+              {allHoles.map(h=>{
+                const sel=selectedHoles.includes(h);
+                const d=course?.holes?.[h];
+                const disabled=!sel&&selectedHoles.length>=numNeed;
+                return(
+                  <button key={h} onClick={()=>toggle(h)} disabled={disabled} style={{
+                    padding:"8px 12px",borderRadius:"8px",minWidth:"52px",textAlign:"center",
+                    border:"1px solid "+(sel?"#C9A84C":"#5a4a20"),
+                    background:sel?"#3a2e00":"transparent",
+                    color:disabled?"#4a3a10":sel?"#f5ead0":"#b09050",
+                    cursor:disabled?"not-allowed":"pointer",
+                    opacity:disabled?0.4:1,
+                    transition:"all 0.15s"
+                  }}>
+                    <div style={{fontWeight:"bold",fontSize:"14px"}}>H{h}</div>
+                    {d&&<div style={{fontSize:"10px",color:sel?"#c9b06a":"#7a6030"}}>Par {d.par}</div>}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{display:"flex",gap:"8px"}}>
+              <button style={{...S.btn("g"),flex:1}} onClick={()=>setStep(1)}>← Volver</button>
+              <button style={{...S.btn("p"),flex:2,padding:"11px"}} onClick={confirmar}>Confirmar hoyos →</button>
+            </div>
+          </div>
+        );
+      })()}
       {step===2&&(
         <div style={{...S.card,background:L?"#f5f0e8":"#1c1810",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"12px",flexWrap:"wrap",gap:"6px"}}>
