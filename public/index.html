@@ -1333,28 +1333,23 @@ function NewRound({user,onSave,onCancel,editRound}){
             if(!meta.tipo){setErr("Elegí el tipo de vuelta: Práctica o Competitiva.");return}
             if(meta.hcp===""||meta.hcp===null){setErr("Ingresá tu handicap de hoy.");return}
             setErr("");
-            const course=COURSES[meta.courseId];
-            const totalHoyos=course?Object.keys(course.holes||{}).length:parseInt(meta.numHoles);
+            const courseObj=COURSES.find(c=>c.id===meta.courseId);
+            const totalHoyos=courseObj?courseObj.holes:parseInt(meta.numHoles);
             if(parseInt(meta.numHoles)<totalHoyos){
               setSelectedHoles([]);setStep(1.5);
             }else{
-              // Path directo: inicializar holes con datos reales de la cancha
+              // Path directo: inicializar holes del 1 al N
               const newH={};
-              if(course){
-                Object.entries(course.holes||{}).forEach(([h,d])=>{
-                  newH[h]={par:d.par||"",dist:d.dist||"",hcpIdx:d.hcpIdx||"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};
-                });
-              }else{
-                for(let h=1;h<=parseInt(meta.numHoles);h++){newH[h]={par:"",dist:"",hcpIdx:"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};}
-              }
+              for(let h=1;h<=totalHoyos;h++){newH[h]={par:"",dist:"",hcpIdx:"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};};
               setHoles(newH);setStep(2);
             }
           }}>Ir a la tarjeta →</button>
         </div>
       )}
       {step===1.5&&(()=>{
-        const course=COURSES[meta.courseId];
-        const allHoles=course?Object.keys(course.holes||{}).sort((a,b)=>parseInt(a)-parseInt(b)):[];
+        const courseObj=COURSES.find(c=>c.id===meta.courseId);
+        const totalHoyosCurso=courseObj?courseObj.holes:18;
+        const allHoles=Array.from({length:totalHoyosCurso},(_,i)=>String(i+1));
         const numNeed=parseInt(meta.numHoles);
         const toggle=h=>{
           setSelectedHoles(prev=>{
@@ -1365,11 +1360,9 @@ function NewRound({user,onSave,onCancel,editRound}){
         };
         const confirmar=()=>{
           if(selectedHoles.length!==numNeed){setErr("Seleccioná exactamente "+numNeed+" hoyo"+(numNeed===1?"":"s")+".");return;}
-          // Armar holes solo con los seleccionados, con datos de la cancha
           const newH={};
           selectedHoles.forEach(h=>{
-            const d=course?.holes?.[h]||{};
-            newH[h]={par:d.par||"",dist:d.dist||"",hcpIdx:d.hcpIdx||"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:""};
+            newH[h]={par:"",dist:"",hcpIdx:"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};
           });
           setHoles(newH);setErr("");setStep(2);
         };
@@ -1381,7 +1374,6 @@ function NewRound({user,onSave,onCancel,editRound}){
             <div style={{display:"flex",flexWrap:"wrap",gap:"8px",marginBottom:"18px"}}>
               {allHoles.map(h=>{
                 const sel=selectedHoles.includes(h);
-                const d=course?.holes?.[h];
                 const disabled=!sel&&selectedHoles.length>=numNeed;
                 return(
                   <button key={h} onClick={()=>toggle(h)} disabled={disabled} style={{
@@ -1394,7 +1386,6 @@ function NewRound({user,onSave,onCancel,editRound}){
                     transition:"all 0.15s"
                   }}>
                     <div style={{fontWeight:"bold",fontSize:"14px"}}>H{h}</div>
-                    {d&&<div style={{fontSize:"10px",color:sel?"#c9b06a":"#7a6030"}}>Par {d.par}</div>}
                   </button>
                 );
               })}
