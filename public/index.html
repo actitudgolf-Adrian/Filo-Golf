@@ -1174,7 +1174,7 @@ function NewRound({user,onSave,onCancel,editRound}){
     if(!meta.courseId){setErr("Seleccioná una cancha.");return}
     // Validación por hoyo
     const avisos=[];
-    for(let h=1;h<=holeCount;h++){
+    for(const h of Object.keys(holes).sort((a,b)=>parseInt(a)-parseInt(b))){
       const hd=holes[h]||{};
       if(!parseInt(hd.shots)){avisos.push(`Hoyo ${h}: falta cantidad de golpes`);continue;}
       if(parseInt(hd.putts)===""||hd.putts===""){avisos.push(`Hoyo ${h}: falta cantidad de putts`);}
@@ -1338,7 +1338,16 @@ function NewRound({user,onSave,onCancel,editRound}){
             if(parseInt(meta.numHoles)<totalHoyos){
               setSelectedHoles([]);setStep(1.5);
             }else{
-              setStep(2);
+              // Path directo: inicializar holes con datos reales de la cancha
+              const newH={};
+              if(course){
+                Object.entries(course.holes||{}).forEach(([h,d])=>{
+                  newH[h]={par:d.par||"",dist:d.dist||"",hcpIdx:d.hcpIdx||"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};
+                });
+              }else{
+                for(let h=1;h<=parseInt(meta.numHoles);h++){newH[h]={par:"",dist:"",hcpIdx:"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};}
+              }
+              setHoles(newH);setStep(2);
             }
           }}>Ir a la tarjeta →</button>
         </div>
@@ -1453,8 +1462,8 @@ function NewRound({user,onSave,onCancel,editRound}){
             )}
           </div>
 
-          {Array.from({length:holeCount},(_,i)=>i+1).map(h=>(
-            <HoleCard key={h} hole={h} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false} lightMode={lightMode}/>
+          {Object.keys(holes).sort((a,b)=>parseInt(a)-parseInt(b)).map(h=>(
+            <HoleCard key={h} hole={parseInt(h)} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false} lightMode={lightMode}/>
           ))}
           <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderTop:`2px solid ${L?"#c8a84c":"#7a6030"}`,marginTop:"6px"}}>
             <div style={{color:L?"#7a5010":"#b09050",fontSize:"12px"}}>Putts: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalChips}</span> · Búnker: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalBunker}</span></div>
@@ -3049,7 +3058,7 @@ th{background:#1a1612;color:#C9A84C;padding:7px 6px;text-align:center;font-size:
   </div>`:""}
 </div>
 <div class="footer"><span>φ Filo Golf · una creación de Actitud Golf, aprendemos juntos</span></div>
-<script>
+<\x73cript>
 function descargarConRespuesta(){
   var reflexion=document.getElementById('reflexionJugador').value;
   var html=document.documentElement.outerHTML;
