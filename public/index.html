@@ -1119,7 +1119,7 @@ function NewRound({user,onSave,onCancel,editRound}){
   const [meta,setMeta]=useState(()=>{
     if(editRound)return{courseId:editRound.courseId||editRound.course_id||"",date:editRound.date,format:editRound.format,tipo:editRound.tipo||"Práctica",hcp:editRound.hcp||18,hcpT:editRound.hcpT||editRound.hcpt||"libre",numHoles:editRound.numHoles||editRound.num_holes||18,savedConfig:""};
     if(existingDraft)return existingDraft.meta;
-    return{courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",tipo:"",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18,savedConfig:""};
+    return{courseId:"",date:new Date().toISOString().slice(0,10),format:"",tipo:"",hcp:"",hcpT:user.hcpT||"libre",numHoles:"",savedConfig:""};
   });
   const [holes,setHoles]=useState(()=>editRound?{...editRound.holes}:existingDraft?existingDraft.holes:{});
   const [err,setErr]=useState("");
@@ -1156,7 +1156,7 @@ function NewRound({user,onSave,onCancel,editRound}){
 
   function discardDraft(){
     lsSet(DRAFT_KEY,null);
-    setMeta({courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",tipo:"",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18,savedConfig:""});
+    setMeta({courseId:"",date:new Date().toISOString().slice(0,10),format:"",tipo:"",hcp:"",hcpT:user.hcpT||"libre",numHoles:"",savedConfig:""});
     setHoles({});setPlan0({});
     setShowDraftBanner(false);
   }
@@ -1298,12 +1298,13 @@ function NewRound({user,onSave,onCancel,editRound}){
               </div>
             </div>
           )}
-          <label style={S.lbl}>Cantidad de hoyos</label>
-          <input style={{...S.inp,marginBottom:"11px"}} type="number" min="1" max="36" value={meta.numHoles} onChange={e=>setMeta(m=>({...m,numHoles:e.target.value}))}/>
-          <label style={S.lbl}>Fecha</label>
-          <input style={{...S.inp,marginBottom:"11px"}} type="date" value={meta.date} onChange={e=>setMeta(m=>({...m,date:e.target.value}))}/>
-          <label style={S.lbl}>Formato</label>
-          <select style={{...S.sel,marginBottom:"11px"}} value={meta.format} onChange={e=>setMeta(m=>({...m,format:e.target.value}))}>
+          <label style={S.lbl}>Cantidad de hoyos <span style={{color:"#e05050"}}>*</span></label>
+          <input style={{...S.inp,marginBottom:"11px",borderColor:meta.numHoles?"#5a4a20":"#e05050"}} type="number" min="1" max="36" placeholder="¿Cuántos hoyos jugás hoy?" value={meta.numHoles} onChange={e=>setMeta(m=>({...m,numHoles:e.target.value}))}/>
+          <label style={S.lbl}>Fecha <span style={{color:"#e05050"}}>*</span></label>
+          <input style={{...S.inp,marginBottom:"11px",borderColor:meta.date?"#5a4a20":"#e05050"}} type="date" value={meta.date} onChange={e=>setMeta(m=>({...m,date:e.target.value}))}/>
+          <label style={S.lbl}>Formato <span style={{color:"#e05050"}}>*</span></label>
+          <select style={{...S.sel,marginBottom:"11px",borderColor:meta.format?"#5a4a20":"#e05050"}} value={meta.format} onChange={e=>setMeta(m=>({...m,format:e.target.value}))}>
+            <option value="">— Elegí el formato —</option>
             {(user.isCoach?FORMATS_ALL:FORMATS_A).map(f=><option key={f}>{f}</option>)}
           </select>
           <label style={S.lbl}>Tipo de vuelta <span style={{color:"#e05050"}}>*</span></label>
@@ -1312,14 +1313,26 @@ function NewRound({user,onSave,onCancel,editRound}){
             <option>Práctica</option><option>Competitiva</option>
           </select>
           <div style={{...S.g2,marginBottom:"11px"}}>
-            <div><label style={S.lbl}>Handicap</label><input style={S.inp} type="number" min="0" max="54" value={meta.hcp} onChange={e=>setMeta(m=>({...m,hcp:e.target.value}))}/></div>
+            <div>
+              <label style={S.lbl}>Handicap hoy <span style={{color:"#e05050"}}>*</span></label>
+              <input style={{...S.inp,borderColor:meta.hcp!==""?"#5a4a20":"#e05050"}} type="number" min="0" max="54" placeholder="HCP de hoy" value={meta.hcp} onChange={e=>setMeta(m=>({...m,hcp:e.target.value}))}/>
+              <div style={{color:"#8a7040",fontSize:"10px",marginTop:"3px"}}>Perfil: {user.hcp} · modificá si jugás diferente hoy</div>
+            </div>
             <div><label style={S.lbl}>Tipo</label>
               <select style={S.sel} value={meta.hcpT} onChange={e=>setMeta(m=>({...m,hcpT:e.target.value}))}>
                 <option value="libre">Libre</option><option value="aag">Oficial AAG</option>
               </select>
             </div>
           </div>
-          <button style={{...S.btn("p"),width:"100%",padding:"12px"}} onClick={()=>{if(!meta.courseId){setErr("Seleccioná una cancha.");return}if(!meta.tipo){setErr("Elegí el tipo de vuelta: Práctica o Competitiva.");return}setErr("");setStep(2)}}>Ir a la tarjeta →</button>
+          <button style={{...S.btn("p"),width:"100%",padding:"12px"}} onClick={()=>{
+            if(!meta.courseId){setErr("Seleccioná una cancha.");return}
+            if(!meta.numHoles){setErr("Indicá la cantidad de hoyos.");return}
+            if(!meta.date){setErr("Seleccioná la fecha.");return}
+            if(!meta.format){setErr("Elegí el formato de juego.");return}
+            if(!meta.tipo){setErr("Elegí el tipo de vuelta: Práctica o Competitiva.");return}
+            if(meta.hcp===""||meta.hcp===null){setErr("Ingresá tu handicap de hoy.");return}
+            setErr("");setStep(2);
+          }}>Ir a la tarjeta →</button>
         </div>
       )}
       {step===2&&(
@@ -4620,9 +4633,10 @@ function App(){
     if(!u)return "stats";
     // Si hay clase activa y el usuario es coach, arrancar directo en "coach"
     if(u.isCoach&&lsGet("coach:claseActiva"))return "coach";
-    // Restaurar última pestaña visitada
+    // Si hay vuelta en progreso, restaurar la pestaña (puede ser "ronda")
     const saved=lsGet("nav:"+u.username);
-    if(saved&&saved.tab)return saved.tab;
+    if(saved&&saved.newRound)return saved.tab||"stats";
+    // Sin vuelta en progreso: siempre arrancar en Mis Stats
     return "stats";
   });
   const [newRound,setNR]=useState(()=>{
