@@ -1154,7 +1154,7 @@ function NewRound({user,onSave,onCancel,editRound}){
 
   function discardDraft(){
     lsSet(DRAFT_KEY,null);
-    setMeta({courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",tipo:"Práctica",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18,savedConfig:""});
+    setMeta({courseId:"",date:new Date().toISOString().slice(0,10),format:"Strokeplay",tipo:"",hcp:user.hcp||18,hcpT:user.hcpT||"libre",numHoles:18,savedConfig:""});
     setHoles({});setPlan0({});
     setShowDraftBanner(false);
   }
@@ -1820,9 +1820,9 @@ function Profile({user,onUpdate}){
 
   async function save(){
     const u={...user,hcp:parseFloat(f.hcp)||0,hcpT:f.hcpT};
-    lsSet("user:"+user.username,u);lsSet("session",u);lsSet("notas:"+user.username,notas);lsSet("bolsa:"+user.username,bolsa);
-    await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,bolsa,joined_at:user.joinedAt||Date.now()});
-    onUpdate(u);setMsg("✓ Perfil actualizado.");
+    lsSet("user:"+user.username,{...u,pass:lsGet("pass:"+user.username)});lsSet("session",u);lsSet("notas:"+user.username,notas);lsSet("bolsa:"+user.username,bolsa);
+    const ok=await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,bolsa,joined_at:user.joinedAt||Date.now()});
+    onUpdate(u);setMsg(ok?"✓ Perfil actualizado.":"✓ Guardado localmente (sin conexión).");
   }
 
   function deleteConfig(key){
