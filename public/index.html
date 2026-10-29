@@ -32,7 +32,7 @@ const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 const H={"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"resolution=merge-duplicates"};
 
 async function sbQ(path){try{const r=await fetch(SB_URL+"/rest/v1/"+path,{headers:H});if(!r.ok)return[];return await r.json();}catch{return[]}}
-async function sbU(table,data){try{const r=await fetch(SB_URL+"/rest/v1/"+table,{method:"POST",headers:H,body:JSON.stringify(data)});return r.ok;}catch{return false}}
+async function sbU(table,data,conflict){try{const url=SB_URL+"/rest/v1/"+table+(conflict?"?on_conflict="+conflict:"");const r=await fetch(url,{method:"POST",headers:{...H,"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(data)});return r.ok||r.status===204||r.status===201;}catch{return false}}
 async function sbPatch(table,match,data){try{const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");const r=await fetch(SB_URL+"/rest/v1/"+table+"?"+q,{method:"PATCH",headers:H,body:JSON.stringify(data)});return r.ok;}catch{return false}}
 async function sbD(table,match){try{const q=Object.entries(match).map(([k,v])=>`${k}=eq.${v}`).join("&");const r=await fetch(SB_URL+"/rest/v1/"+table+"?"+q,{method:"DELETE",headers:H});return r.ok;}catch{return false}}
 
@@ -821,7 +821,9 @@ function Auth({onLogin}){
       if(!s){setErr("Usuario no encontrado.");return}
       const pass=(sb&&sb.pass)||lsGet("pass:"+u)||s.pass;
       if(pass!==f.pass){setErr("Contraseña incorrecta.");return}
-      const ud={username:s.username,name:s.name,hcp:s.hcp||18,hcpT:s.hcpt||s.hcpT||"libre",isCoach:false,joinedAt:s.joined_at};
+      // Usar el HCP local si es más reciente que Supabase (Supabase puede estar desactualizado por fallo previo)
+      const hcpFinal=local&&local.hcp!=null?local.hcp:(sb?sb.hcp:18);
+      const ud={username:s.username,name:s.name,hcp:hcpFinal||18,hcpT:(local&&local.hcpT)||s.hcpt||s.hcpT||"libre",isCoach:false,joinedAt:s.joined_at};
       lsSet("session",ud);lsSet("user:"+u,{...ud,pass:f.pass});lsSet("pass:"+u,f.pass);onLogin(ud);
     }catch(e){setErr("Error de conexión.");}
     finally{setBusy(false);}
@@ -1821,7 +1823,7 @@ function Profile({user,onUpdate}){
   async function save(){
     const u={...user,hcp:parseFloat(f.hcp)||0,hcpT:f.hcpT};
     lsSet("user:"+user.username,{...u,pass:lsGet("pass:"+user.username)});lsSet("session",u);lsSet("notas:"+user.username,notas);lsSet("bolsa:"+user.username,bolsa);
-    const ok=await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,bolsa,joined_at:user.joinedAt||Date.now()});
+    const ok=await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,bolsa,joined_at:user.joinedAt||Date.now()},"username");
     onUpdate(u);setMsg(ok?"✓ Perfil actualizado.":"✓ Guardado localmente (sin conexión).");
   }
 
