@@ -115,6 +115,17 @@ const FORMATS_ALL=["Strokeplay","Stableford","Match Play","Fourball","Foursome",
 const FORMATS_A=["Strokeplay","Stableford","Match Play","Fourball","Golpe Alternado","Fourball Match Play"];
 const ZONES=["Caminata","Zona de Reflexión","Zona de Colocación","Zona de Ejecución","Posterior al Golpe"];
 
+// Configuración de bolsa de palos
+const BAG_CATS=[
+  {cat:"Driver",opts:["DR"],loft:true},
+  {cat:"Madera",opts:["M3","M5","M7","M9"]},
+  {cat:"Iron Driver",opts:["ID"]},
+  {cat:"Híbrido",opts:["Hib3","Hib4","Hib5","Hib6"]},
+  {cat:"Hierro",opts:["H1","H2","H3","H4","H5","H6","H7","H8","H9","HPW","HPIC"]},
+  {cat:"Wedge",opts:["W48","W49","W50","W51","W52","W53","W54","W55","W56","W57","W58","W59","W60","W61"]},
+  {cat:"Putter",opts:["PT"]},
+];
+
 function getCat(h){h=parseFloat(h)||0;if(h<=12)return"A (0-12)";if(h<=24)return"B (13-24)";if(h<=36)return"C (25-36)";return"D (37-54)"}
 
 const S={
@@ -1799,12 +1810,17 @@ function Profile({user,onUpdate}){
   const [f,setF]=useState({hcp:user.hcp||18,hcpT:user.hcpT||"libre"});
   const [notas,setNotas]=useState(()=>lsGet("notas:"+user.username)||{});
   const [configs,setConfigs]=useState(()=>lsGet("configs:"+user.username)||{});
+  const [bolsa,setBolsa]=useState(()=>lsGet("bolsa:"+user.username)||[]);
   const [msg,setMsg]=useState("");
+
+  function togglePalo(palo){
+    setBolsa(prev=>prev.includes(palo)?prev.filter(p=>p!==palo):[...prev,palo]);
+  }
 
   async function save(){
     const u={...user,hcp:parseFloat(f.hcp)||0,hcpT:f.hcpT};
-    lsSet("user:"+user.username,u);lsSet("session",u);lsSet("notas:"+user.username,notas);
-    await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,joined_at:user.joinedAt||Date.now()});
+    lsSet("user:"+user.username,u);lsSet("session",u);lsSet("notas:"+user.username,notas);lsSet("bolsa:"+user.username,bolsa);
+    await sbU("users",{username:user.username,name:user.name,hcp:parseFloat(f.hcp)||0,hcpt:f.hcpT,notas,bolsa,joined_at:user.joinedAt||Date.now()});
     onUpdate(u);setMsg("✓ Perfil actualizado.");
   }
 
@@ -1834,6 +1850,25 @@ function Profile({user,onUpdate}){
             <div key={z} style={{marginBottom:"10px"}}>
               <label style={S.lbl}>{z}</label>
               <textarea style={{...S.inp,minHeight:"52px",resize:"vertical"}} placeholder={`Mi recordatorio para ${z.toLowerCase()}...`} value={notas[z]||""} onChange={e=>setNotas(n=>({...n,[z]:e.target.value}))}/>
+            </div>
+          ))}
+        </div>
+        <div style={{borderTop:"1px solid #5a4a20",paddingTop:"14px",marginBottom:"14px"}}>
+          <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"4px"}}>Mi Bolsa de Palos</div>
+          <div style={{color:"#b09050",fontSize:"11px",marginBottom:"12px"}}>{bolsa.length===0?"Sin palos configurados — seleccioná los que llevás habitualmente":bolsa.length+" palo"+(bolsa.length===1?"":"s")+" configurado"+(bolsa.length===1?"":"s")}</div>
+          {BAG_CATS.map(({cat,opts})=>(
+            <div key={cat} style={{marginBottom:"10px"}}>
+              <div style={{color:"#c9b06a",fontSize:"11px",marginBottom:"5px",fontWeight:"bold"}}>{cat}</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
+                {opts.map(p=>{
+                  const on=bolsa.includes(p);
+                  return(
+                    <button key={p} onClick={()=>togglePalo(p)} style={{padding:"5px 11px",borderRadius:"6px",border:"1px solid "+(on?"#C9A84C":"#5a4a20"),background:on?"#3a2e00":"transparent",color:on?"#f5ead0":"#8a7040",fontSize:"12px",fontWeight:on?"bold":"normal",cursor:"pointer",transition:"all 0.15s"}}>
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
@@ -4364,6 +4399,27 @@ function CoachPanel(){
                 ));
               })()}
               <div style={{borderTop:"1px solid #5a4a20",marginTop:"14px",paddingTop:"14px"}}>
+                <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Bolsa de Palos</div>
+                {(()=>{
+                  const bolsaJ=selPlayer.user.bolsa||[];
+                  if(bolsaJ.length===0)return <div style={{color:"#b09050",fontSize:"13px",marginBottom:"14px"}}>Sin bolsa configurada.</div>;
+                  return(
+                    <div style={{marginBottom:"14px"}}>
+                      {BAG_CATS.map(({cat,opts})=>{
+                        const tiene=opts.filter(p=>bolsaJ.includes(p));
+                        if(tiene.length===0)return null;
+                        return(
+                          <div key={cat} style={{marginBottom:"8px"}}>
+                            <span style={{color:"#b09050",fontSize:"10px",letterSpacing:"1px",textTransform:"uppercase",marginRight:"8px"}}>{cat}:</span>
+                            {tiene.map(p=><span key={p} style={{display:"inline-block",background:"#3a2e00",border:"1px solid #C9A84C",color:"#f5ead0",borderRadius:"5px",padding:"2px 8px",fontSize:"11px",marginRight:"4px",marginBottom:"3px"}}>{p}</span>)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+              <div style={{borderTop:"1px solid #5a4a20",marginTop:"14px",paddingTop:"14px"}}>
                 <div style={{color:gold,fontSize:"12px",letterSpacing:"2px",textTransform:"uppercase",marginBottom:"8px"}}>Configuraciones de cancha</div>
                 {(()=>{
                   const cfgs={...PRESET_CONFIGS,...(lsGet("configs:"+selPlayer.user.username)||{})};
@@ -4596,7 +4652,16 @@ function App(){
     :[["stats","Mis Stats"],["myrounds","Mis Vueltas"],["ronda","+ Vuelta"],["clases","Mis Clases"],["canchas","Canchas"],["profile","Perfil"]];
 
   function go(t){
-    if(t==="ronda"){setNR(true);if(user)lsSet("nav:"+user.username,{tab,newRound:true});return;}
+    if(t==="ronda"){
+      const bolsaActual=lsGet("bolsa:"+user.username)||[];
+      if(bolsaActual.length===0){
+        alert("⛳ No tenés tu bolsa de palos configurada.\n\nAndá a Perfil → Mi Bolsa y seleccioná los palos que llevás. Es una sola vez y para siempre (salvo que los modifiques).");
+        setNR(false);setTab("profile");
+        if(user)lsSet("nav:"+user.username,{tab:"profile",newRound:false});
+        return;
+      }
+      setNR(true);if(user)lsSet("nav:"+user.username,{tab,newRound:true});return;
+    }
     setNR(false);setTab(t);
     if(user)lsSet("nav:"+user.username,{tab:t,newRound:false});
   }
