@@ -897,6 +897,96 @@ function Auth({onLogin}){
   );
 }
 
+// ─── GreenZoneSelector ───────────────────────────────────────────
+// Selector visual 3x3 alrededor de un hoyo central.
+// Props:
+//   value: string o array de strings (zona(s) seleccionada(s))
+//   onChange: fn(val) — val es string si multi=false, array si multi=true
+//   multi: bool (false = una sola selección, true = hasta maxSel)
+//   maxSel: número máximo de selecciones cuando multi=true (default 4)
+//   lightMode: bool
+//   label: string opcional arriba del selector
+//   size: "sm" | "md" (default "md")
+// Zonas: 9 posiciones + hoyo central (no seleccionable)
+// Layout:
+//   [CL] [CC] [CD]
+//   [ML]  ⛳  [MD]
+//   [LL] [LC] [LD]
+// Etiquetas visibles:
+//   CL=Corto Izq, CC=Corto Centro, CD=Corto Der
+//   ML=Medio Izq,               MD=Medio Der
+//   LL=Largo Izq, LC=Largo Centro, LD=Largo Der
+const ZONE_KEYS=["CL","CC","CD","ML","MD","LL","LC","LD"];
+const ZONE_LABELS={CL:"C.Izq",CC:"Corto",CD:"C.Der",ML:"M.Izq",MD:"M.Der",LL:"L.Izq",LC:"Largo",LD:"L.Der"};
+
+function GreenZoneSelector({value,onChange,multi=false,maxSel=4,lightMode=false,label="",size="md"}){
+  const L=lightMode;
+  const gold="#C9A84C";
+  const sm=size==="sm";
+  const cellSize=sm?44:52;
+  const holeSize=sm?32:38;
+  const fontSize=sm?"9px":"10px";
+
+  const selected=multi?(Array.isArray(value)?value:[]):(value?[value]:[]);
+
+  function toggle(z){
+    if(multi){
+      if(selected.includes(z)){
+        onChange(selected.filter(s=>s!==z));
+      } else {
+        if(selected.length<maxSel) onChange([...selected,z]);
+      }
+    } else {
+      onChange(selected.includes(z)?null:z);
+    }
+  }
+
+  const grid=[
+    ["CL","CC","CD"],
+    ["ML","HOLE","MD"],
+    ["LL","LC","LD"],
+  ];
+
+  return(
+    <div style={{marginBottom:"8px"}}>
+      {label&&<div style={{fontSize:"11px",color:L?"#7a5010":"#b09050",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px"}}>{label}{multi&&maxSel>1&&<span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}> (hasta {maxSel})</span>}</div>}
+      <div style={{display:"inline-block",background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"8px",padding:"6px"}}>
+        {grid.map((row,ri)=>(
+          <div key={ri} style={{display:"flex",gap:"4px",marginBottom:ri<2?"4px":"0"}}>
+            {row.map(z=>{
+              if(z==="HOLE") return(
+                <div key="hole" style={{width:cellSize,height:cellSize,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}}>
+                  <div style={{width:holeSize,height:holeSize,borderRadius:"50%",background:L?"#c8b880":"#5a4a20",border:`2px solid ${gold}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:sm?"16px":"20px"}}>⛳</div>
+                </div>
+              );
+              const sel=selected.includes(z);
+              return(
+                <button key={z} onClick={()=>toggle(z)} style={{
+                  width:cellSize,height:cellSize,
+                  background:sel?`linear-gradient(135deg,${gold},#a8822a)`:L?"#f5f0e8":"#2a2318",
+                  border:`2px solid ${sel?gold:L?"#c8a84c":"#5a4a20"}`,
+                  borderRadius:"6px",cursor:"pointer",
+                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+                  gap:"2px",transition:"all 0.15s",
+                  opacity:(!sel&&multi&&selected.length>=maxSel)?0.4:1,
+                }}>
+                  <span style={{fontSize,color:sel?"#1a1612":L?"#5a3010":"#b09050",fontWeight:sel?"bold":"normal",lineHeight:1,textAlign:"center",letterSpacing:"0px"}}>{ZONE_LABELS[z]}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {multi&&selected.length>0&&(
+        <div style={{marginTop:"4px",fontSize:"10px",color:L?"#7a5010":"#9a7840"}}>
+          Seleccionado: {selected.map(z=>ZONE_LABELS[z]).join(", ")}
+        </div>
+      )}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────
+
 function HoleCard({hole,data,onChange,readonly,lightMode}){
   const [open,setOpen]=useState(false);
   const [recStatus,setRecStatus]=useState("idle");
@@ -1042,6 +1132,23 @@ function HoleCard({hole,data,onChange,readonly,lightMode}){
       </div>
       <div style={{marginBottom:"12px"}}>
         <label style={HL.lbl}>Tiros al green</label>
+        {!readonly&&(
+          <div style={{marginBottom:"10px"}}>
+            <GreenZoneSelector
+              label="Posición de bandera"
+              value={d.flagPos||null}
+              onChange={v=>upd("flagPos",v)}
+              multi={false}
+              lightMode={L}
+              size="sm"
+            />
+          </div>
+        )}
+        {readonly&&d.flagPos&&(
+          <div style={{marginBottom:"8px",fontSize:"11px",color:L?"#7a5010":"#b09050"}}>
+            Bandera: <span style={{color:gold,fontWeight:"bold"}}>{ZONE_LABELS[d.flagPos]||d.flagPos}</span>
+          </div>
+        )}
         {tirosG.map((t,i)=>(
           <div key={i} style={{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"10px",marginBottom:"8px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
