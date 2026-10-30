@@ -1051,6 +1051,8 @@ function BagSelector({value,onChange,username,lightMode,label="Palo elegido"}){
 function HoleCard({hole,data,onChange,readonly,lightMode,username}){
   const [open,setOpen]=useState(false);
   const [recStatus,setRecStatus]=useState("idle");
+  const [openTA,setOpenTA]=useState(false);
+  const [openTG,setOpenTG]=useState(false);
   const L=lightMode||false;
   const d=data||{shots:"",putts:"",chips:0,bunker:0,tirosGreen:[],par:"",dist:"",hcpIdx:"",distPutt1:"",salida:"",zones:{},note:""};
   const upd=(k,v)=>onChange({...d,[k]:v});
@@ -1166,8 +1168,6 @@ function HoleCard({hole,data,onChange,readonly,lightMode,username}){
         const ZONA_ND_DIST=["Muy larga de deseada","Muy corta de deseada","Muy larga de errada","Muy corta de errada"];
         const TIPO_GOLPE=["Pesado","Filaso","Otro"];
 
-        const [openTA,setOpenTA]=useState(false);
-
         function addTiroAvance(){
           upd("tirosAvance",[...tiros,{palo:"",superficie:"fairway",asiento:[],zonaEleg:"",zonaErrada:[],zonaTerm:"",ndDonde:"",ndDist:"",tipoGolpe:"",nota:""}]);
         }
@@ -1185,7 +1185,7 @@ function HoleCard({hole,data,onChange,readonly,lightMode,username}){
 
         return(
           <div style={{marginBottom:"14px"}}>
-            <button onClick={()=>setOpenTA(o=>!o)} style={{
+            <button onClick={()=>{setOpenTA(o=>!o);setOpenTG(false);}} style={{
               background:L?"#e8e0d0":"#2d2720",color:L?"#5a3010":"#f5ead0",
               border:`1px solid ${incomplete>0?"#c07030":L?"#c8a84c":"#7a6030"}`,
               borderRadius:"6px",padding:"10px 14px",fontSize:"13px",cursor:"pointer",
@@ -1197,7 +1197,7 @@ function HoleCard({hole,data,onChange,readonly,lightMode,username}){
                 <span>{openTA?"▲":"▼"}</span>
               </span>
             </button>
-            {openTA&&(
+            {openTA&&(  
               <div style={{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"0 0 6px 6px",padding:"12px",marginTop:"-1px"}}>
                 {tiros.map((t,i)=>(
                   <div key={i} style={{background:L?"#f5f0e8":"#1c1810",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"12px",marginBottom:"10px"}}>
@@ -1378,7 +1378,21 @@ function HoleCard({hole,data,onChange,readonly,lightMode,username}){
         </div>
       </div>
       <div style={{marginBottom:"12px"}}>
-        <label style={HL.lbl}>Tiros al green</label>
+        {!readonly
+          ?<button onClick={()=>{setOpenTG(o=>!o);setOpenTA(false);}} style={{
+              background:L?"#e8e0d0":"#2d2720",color:L?"#5a3010":"#f5ead0",
+              border:`1px solid ${L?"#c8a84c":"#7a6030"}`,
+              borderRadius:"6px",padding:"10px 14px",fontSize:"13px",cursor:"pointer",
+              fontWeight:"bold",width:"100%",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",
+              marginBottom:"4px"
+            }}>
+              <span>⛳ Tiros al green {tirosG.length>0&&`(${tirosG.length})`}</span>
+              <span>{openTG?"▲":"▼"}</span>
+            </button>
+          :<label style={HL.lbl}>Tiros al green</label>
+        }
+        {(openTG||readonly)&&(
+          <div>
         {!readonly&&(
           <div style={{marginBottom:"10px"}}>
             <GreenZoneSelector
@@ -1399,7 +1413,7 @@ function HoleCard({hole,data,onChange,readonly,lightMode,username}){
         {tirosG.map((t,i)=>(
           <div key={i} style={{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"10px",marginBottom:"8px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-              <span style={{color:gold,fontSize:"12px",fontWeight:"bold"}}>Tiro {i+1}</span>
+              <span style={{color:gold,fontSize:"12px",fontWeight:"bold"}}>Tiro a green {i+1}</span>
               {!readonly&&<button style={{...HL.btn("d"),padding:"4px 10px",fontSize:"11px"}} onClick={()=>removeTiro(i)}>✕</button>}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"8px"}}>
@@ -1533,6 +1547,8 @@ function HoleCard({hole,data,onChange,readonly,lightMode,username}){
           <button style={{...HL.btn("g"),width:"100%",padding:"10px",fontSize:"13px"}} onClick={addTiro}>+ Agregar tiro al green</button>
         )}
         {readonly&&tirosG.length===0&&<div style={{color:L?"#7a5010":"#b09050",fontSize:"11px",fontStyle:"italic"}}>{parseInt(d.par)===3?"Tiro directo (par 3)":"Sin tiros registrados"}</div>}
+          </div>
+        )}
       </div>
       {(parseInt(d.putts)||0)>0&&(
         <div style={{marginBottom:"10px"}}>
