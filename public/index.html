@@ -1046,6 +1046,99 @@ function BagSelector({value,onChange,username,lightMode,label="Palo elegido"}){
     </div>
   );
 }
+// ─── TiroGreenDetalle ─────────────────────────────────────────────
+function TiroGreenDetalle({t,i,updTiro,lightMode,username}){
+  const L=lightMode||false;
+  const [openDet,setOpenDet]=useState(false);
+  const HL={
+    inp:{background:L?"#fff9f0":"#2a2318",border:`2px solid ${L?"#c8a84c":"#7a6030"}`,borderRadius:"4px",color:L?"#1a1200":"#f5ead0",padding:"9px 11px",fontSize:"14px",width:"100%",boxSizing:"border-box",outline:"none"},
+    lbl:{fontSize:"11px",color:L?"#7a5010":"#b09050",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"},
+    btn:v=>({background:v==="p"?`linear-gradient(135deg,${gold},#a8822a)`:v==="d"?L?"#ffdddd":"#5a1a1a":L?"#e8e0d0":"#2d2720",color:v==="p"?"#1a1612":v==="d"?L?"#c02020":"#f5ead0":L?"#5a3010":"#f5ead0",border:v==="g"?`1px solid ${L?"#c8a84c":"#7a6030"}`:"none",borderRadius:"4px",padding:"9px 15px",fontSize:"13px",cursor:"pointer",fontWeight:"bold"}),
+  };
+  const ASIENTO_FW=["Normal","Divot","Sobre los pies","Bajo los pies","Pie der más alto","Pie izq más alto"];
+  const ASIENTO_RGH_H=["Normal","¼ enterrada","½ enterrada","¾ hundida","Entera hundida","Más de una bola"];
+  const ASIENTO_RGH_P=["Pasto a favor","Pasto en contra","Pasto neutro"];
+  function togAsiento(val){
+    const cur=t.asientoG||[];
+    updTiro(i,"asientoG",cur.includes(val)?cur.filter(x=>x!==val):[...cur,val].slice(0,3));
+  }
+  return(
+    <div style={{marginTop:"8px"}}>
+      <button onClick={()=>setOpenDet(o=>!o)} style={{
+        background:L?"#e8e0d0":"#1c1810",color:L?"#5a3010":"#b09050",
+        border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,
+        borderRadius:"6px",padding:"7px 12px",fontSize:"12px",cursor:"pointer",width:"100%",textAlign:"left",
+        display:"flex",justifyContent:"space-between",alignItems:"center"
+      }}>
+        <span>🎯 Detalle del tiro {t.zonaElegG&&<span style={{color:gold}}>· {ZONE_LABELS[t.zonaElegG]||t.zonaElegG}</span>}</span>
+        <span>{openDet?"▲":"▼"}</span>
+      </button>
+      {openDet&&(
+        <div style={{background:L?"#ede8dc":"#0f0e0b",border:`1px solid ${L?"#c8a84c":"#3a2e10"}`,borderRadius:"0 0 6px 6px",padding:"10px",marginTop:"-1px"}}>
+          <div style={{marginBottom:"8px"}}>
+            <label style={HL.lbl}>Superficie</label>
+            <div style={{display:"flex",gap:"6px"}}>
+              {["fairway","rough"].map(s=>(
+                <button key={s} style={{...HL.btn(t.supGreen===s?"p":"g"),flex:1,padding:"8px",fontSize:"12px"}} onClick={()=>updTiro(i,"supGreen",t.supGreen===s?"":s)}>{s==="fairway"?"Fairway":"Rough"}</button>
+              ))}
+            </div>
+          </div>
+          {t.supGreen==="fairway"&&(
+            <div style={{marginBottom:"8px"}}>
+              <label style={HL.lbl}>Asiento <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 3)</span></label>
+              <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                {ASIENTO_FW.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>togAsiento(a)}>{a}</button>;})}
+              </div>
+            </div>
+          )}
+          {t.supGreen==="rough"&&(
+            <div style={{marginBottom:"8px"}}>
+              <label style={HL.lbl}>Asiento rough <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 3)</span></label>
+              <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"5px"}}>
+                {ASIENTO_RGH_H.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>togAsiento(a)}>{a}</button>;})}
+              </div>
+              <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                {ASIENTO_RGH_P.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>togAsiento(a)}>{a}</button>;})}
+              </div>
+            </div>
+          )}
+          <div style={{marginBottom:"8px"}}>
+            <GreenZoneSelector label="Zona elegida" value={t.zonaElegG||null} onChange={v=>updTiro(i,"zonaElegG",v)} multi={false} lightMode={L} size="sm"/>
+          </div>
+          <div style={{marginBottom:"8px"}}>
+            <GreenZoneSelector label="Zona de errada deseada" value={t.zonaErradaG||[]} onChange={v=>updTiro(i,"zonaErradaG",v)} multi={true} maxSel={4} lightMode={L} size="sm"/>
+          </div>
+          <div style={{marginBottom:"8px"}}>
+            <label style={HL.lbl}>Zona donde terminó</label>
+            <div style={{display:"flex",flexDirection:"column",gap:"5px"}}>
+              {[["elegida","✓ Zona elegida"],["errada","✓ Zona de errada deseada"],["noDeseada","✗ Zona no deseada"]].map(([opt,lbl])=>(
+                <button key={opt} style={{...HL.btn(t.zonaTermG===opt?"p":"g"),padding:"8px",fontSize:"12px",textAlign:"left",border:t.zonaTermG===opt?`2px solid ${gold}`:undefined}} onClick={()=>updTiro(i,"zonaTermG",t.zonaTermG===opt?"":opt)}>{lbl}</button>
+              ))}
+            </div>
+          </div>
+          {t.zonaTermG==="noDeseada"&&(
+            <div style={{background:L?"#ede8dc":"#0f0d0a",border:`1px solid ${L?"#e09040":"#6a3010"}`,borderRadius:"6px",padding:"8px",marginBottom:"8px"}}>
+              <div style={{fontSize:"10px",color:"#e09040",letterSpacing:"1px",marginBottom:"6px"}}>⚠ ZONA NO DESEADA</div>
+              <div style={{marginBottom:"6px"}}>
+                <GreenZoneSelector label="¿Dónde terminó?" value={t.ndDondeG||null} onChange={v=>updTiro(i,"ndDondeG",v)} multi={false} lightMode={L} size="sm"/>
+              </div>
+              <label style={HL.lbl}>Tipo de golpe</label>
+              <div style={{display:"flex",gap:"6px"}}>
+                {["Pesado","Filaso","Otro"].map(g=>(
+                  <button key={g} style={{...HL.btn(t.tipoGolpeG===g?"p":"g"),flex:1,padding:"8px",fontSize:"12px"}} onClick={()=>updTiro(i,"tipoGolpeG",t.tipoGolpeG===g?"":g)}>{g}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div>
+            <label style={HL.lbl}>Nota mental (opcional)</label>
+            <input style={{...HL.inp,fontSize:"12px"}} type="text" placeholder="Lo que pensaste..." value={t.notaG||""} onChange={e=>updTiro(i,"notaG",e.target.value)}/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ─────────────────────────────────────────────────────────────────
 
 function HoleCard({hole,data,onChange,readonly,lightMode,username}){
@@ -1438,89 +1531,8 @@ function HoleCard({hole,data,onChange,readonly,lightMode,username}){
               <option value="largo">❌ Largo</option>
               <option value="lateral">❌ Lateral</option>
             </select>
-            {/* ── Detalle Ataque a Green (desplegable) ── */}
-            {!readonly&&(()=>{
-              const [openDet,setOpenDet]=useState(false);
-              const ASIENTO_FW=["Normal","Divot","Sobre los pies","Bajo los pies","Pie der más alto","Pie izq más alto"];
-              const ASIENTO_RGH_H=["Normal","¼ enterrada","½ enterrada","¾ hundida","Entera hundida","Más de una bola"];
-              const ASIENTO_RGH_P=["Pasto a favor","Pasto en contra","Pasto neutro"];
-              return(
-                <div style={{marginTop:"8px"}}>
-                  <button onClick={()=>setOpenDet(o=>!o)} style={{
-                    background:L?"#e8e0d0":"#1c1810",color:L?"#5a3010":"#b09050",
-                    border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,
-                    borderRadius:"6px",padding:"7px 12px",fontSize:"12px",cursor:"pointer",width:"100%",textAlign:"left",
-                    display:"flex",justifyContent:"space-between",alignItems:"center"
-                  }}>
-                    <span>🎯 Detalle del tiro {t.zonaElegG&&<span style={{color:gold}}>· {ZONE_LABELS[t.zonaElegG]||t.zonaElegG}</span>}</span>
-                    <span>{openDet?"▲":"▼"}</span>
-                  </button>
-                  {openDet&&(
-                    <div style={{background:L?"#ede8dc":"#0f0e0b",border:`1px solid ${L?"#c8a84c":"#3a2e10"}`,borderRadius:"0 0 6px 6px",padding:"10px",marginTop:"-1px"}}>
-                      <div style={{marginBottom:"8px"}}>
-                        <label style={HL.lbl}>Superficie</label>
-                        <div style={{display:"flex",gap:"6px"}}>
-                          {["fairway","rough"].map(s=>(
-                            <button key={s} style={{...HL.btn(t.supGreen===s?"p":"g"),flex:1,padding:"8px",fontSize:"12px"}} onClick={()=>updTiro(i,"supGreen",t.supGreen===s?"":s)}>{s==="fairway"?"Fairway":"Rough"}</button>
-                          ))}
-                        </div>
-                      </div>
-                      {t.supGreen==="fairway"&&(
-                        <div style={{marginBottom:"8px"}}>
-                          <label style={HL.lbl}>Asiento <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 3)</span></label>
-                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
-                            {ASIENTO_FW.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>updTiro(i,"asientoG",(t.asientoG||[]).includes(a)?(t.asientoG||[]).filter(x=>x!==a):[...(t.asientoG||[]),a].slice(0,3))}>{a}</button>;})}
-                          </div>
-                        </div>
-                      )}
-                      {t.supGreen==="rough"&&(
-                        <div style={{marginBottom:"8px"}}>
-                          <label style={HL.lbl}>Asiento rough <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 3)</span></label>
-                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"5px"}}>
-                            {ASIENTO_RGH_H.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>updTiro(i,"asientoG",(t.asientoG||[]).includes(a)?(t.asientoG||[]).filter(x=>x!==a):[...(t.asientoG||[]),a].slice(0,3))}>{a}</button>;})}
-                          </div>
-                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
-                            {ASIENTO_RGH_P.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>updTiro(i,"asientoG",(t.asientoG||[]).includes(a)?(t.asientoG||[]).filter(x=>x!==a):[...(t.asientoG||[]),a].slice(0,3))}>{a}</button>;})}
-                          </div>
-                        </div>
-                      )}
-                      <div style={{marginBottom:"8px"}}>
-                        <GreenZoneSelector label="Zona elegida" value={t.zonaElegG||null} onChange={v=>updTiro(i,"zonaElegG",v)} multi={false} lightMode={L} size="sm"/>
-                      </div>
-                      <div style={{marginBottom:"8px"}}>
-                        <GreenZoneSelector label="Zona de errada deseada" value={t.zonaErradaG||[]} onChange={v=>updTiro(i,"zonaErradaG",v)} multi={true} maxSel={4} lightMode={L} size="sm"/>
-                      </div>
-                      <div style={{marginBottom:"8px"}}>
-                        <label style={HL.lbl}>Zona donde terminó</label>
-                        <div style={{display:"flex",flexDirection:"column",gap:"5px"}}>
-                          {[["elegida","✓ Zona elegida"],["errada","✓ Zona de errada deseada"],["noDeseada","✗ Zona no deseada"]].map(([opt,lbl])=>(
-                            <button key={opt} style={{...HL.btn(t.zonaTermG===opt?"p":"g"),padding:"8px",fontSize:"12px",textAlign:"left",border:t.zonaTermG===opt?`2px solid ${gold}`:undefined}} onClick={()=>updTiro(i,"zonaTermG",t.zonaTermG===opt?"":opt)}>{lbl}</button>
-                          ))}
-                        </div>
-                      </div>
-                      {t.zonaTermG==="noDeseada"&&(
-                        <div style={{background:L?"#ede8dc":"#0f0d0a",border:`1px solid ${L?"#e09040":"#6a3010"}`,borderRadius:"6px",padding:"8px",marginBottom:"8px"}}>
-                          <div style={{fontSize:"10px",color:"#e09040",letterSpacing:"1px",marginBottom:"6px"}}>⚠ ZONA NO DESEADA</div>
-                          <div style={{marginBottom:"6px"}}>
-                            <GreenZoneSelector label="¿Dónde terminó?" value={t.ndDondeG||null} onChange={v=>updTiro(i,"ndDondeG",v)} multi={false} lightMode={L} size="sm"/>
-                          </div>
-                          <label style={HL.lbl}>Tipo de golpe</label>
-                          <div style={{display:"flex",gap:"6px"}}>
-                            {["Pesado","Filaso","Otro"].map(g=>(
-                              <button key={g} style={{...HL.btn(t.tipoGolpeG===g?"p":"g"),flex:1,padding:"8px",fontSize:"12px"}} onClick={()=>updTiro(i,"tipoGolpeG",t.tipoGolpeG===g?"":g)}>{g}</button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      <div>
-                        <label style={HL.lbl}>Nota mental (opcional)</label>
-                        <input style={{...HL.inp,fontSize:"12px"}} type="text" placeholder="Lo que pensaste..." value={t.notaG||""} onChange={e=>updTiro(i,"notaG",e.target.value)}/>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            {/* ── Detalle Ataque a Green ── */}
+            {!readonly&&<TiroGreenDetalle t={t} i={i} updTiro={updTiro} lightMode={L} username={username}/>}
             {/* ── Fin Detalle Ataque a Green ── */}
 
             {/* Aviso: corto/largo/lateral → necesita otro tiro */}
