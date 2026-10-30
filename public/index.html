@@ -1334,22 +1334,28 @@ function NewRound({user,onSave,onCancel,editRound}){
             if(meta.hcp===""||meta.hcp===null){setErr("Ingresá tu handicap de hoy.");return}
             setErr("");
             const courseObj=COURSES.find(c=>c.id===meta.courseId);
-            const totalHoyos=courseObj?courseObj.holes:parseInt(meta.numHoles);
+            const totalHoyos=Object.keys(holes).length>0?Object.keys(holes).length:(courseObj?courseObj.holes:parseInt(meta.numHoles));
             if(parseInt(meta.numHoles)<totalHoyos){
               setSelectedHoles([]);setStep(1.5);
             }else{
-              // Path directo: inicializar holes del 1 al N
-              const newH={};
-              for(let h=1;h<=totalHoyos;h++){newH[h]={par:"",dist:"",hcpIdx:"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};};
-              setHoles(newH);setStep(2);
+              // Path directo: si holes ya tiene datos (de config), usarlos; sino inicializar vacíos
+              if(Object.keys(holes).length===0){
+                const newH={};
+                for(let h=1;h<=totalHoyos;h++){newH[h]={par:"",dist:"",hcpIdx:"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};};
+                setHoles(newH);
+              }
+              setStep(2);
             }
           }}>Ir a la tarjeta →</button>
         </div>
       )}
       {step===1.5&&(()=>{
         const courseObj=COURSES.find(c=>c.id===meta.courseId);
-        const totalHoyosCurso=courseObj?courseObj.holes:18;
-        const allHoles=Array.from({length:totalHoyosCurso},(_,i)=>String(i+1));
+        const totalHoyosCurso=Object.keys(holes).length>0?Object.keys(holes).length:(courseObj?courseObj.holes:18);
+        // allHoles: si hay datos cargados en holes (config con par/dist), usarlos ordenados; sino generar 1..N
+        const allHoles=Object.keys(holes).length>0
+          ?Object.keys(holes).sort((a,b)=>parseInt(a)-parseInt(b))
+          :Array.from({length:totalHoyosCurso},(_,i)=>String(i+1));
         const numNeed=parseInt(meta.numHoles);
         const toggle=h=>{
           setSelectedHoles(prev=>{
@@ -1360,9 +1366,11 @@ function NewRound({user,onSave,onCancel,editRound}){
         };
         const confirmar=()=>{
           if(selectedHoles.length!==numNeed){setErr("Seleccioná exactamente "+numNeed+" hoyo"+(numNeed===1?"":"s")+".");return;}
+          // Si holes tiene datos (config cargada), preservar par/dist/hcpIdx de los hoyos elegidos
           const newH={};
           selectedHoles.forEach(h=>{
-            newH[h]={par:"",dist:"",hcpIdx:"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};
+            const existing=holes[h]||{};
+            newH[h]={par:existing.par||"",dist:existing.dist||"",hcpIdx:existing.hcpIdx||"",shots:"",putts:"",chips:0,bunker:0,salida:"",zones:{},note:"",tirosGreen:[]};
           });
           setHoles(newH);setErr("");setStep(2);
         };
@@ -1386,6 +1394,7 @@ function NewRound({user,onSave,onCancel,editRound}){
                     transition:"all 0.15s"
                   }}>
                     <div style={{fontWeight:"bold",fontSize:"14px"}}>H{h}</div>
+                    {holes[h]?.par&&<div style={{fontSize:"10px",color:sel?"#c9b06a":"#7a6030"}}>Par {holes[h].par}</div>}
                   </button>
                 );
               })}
