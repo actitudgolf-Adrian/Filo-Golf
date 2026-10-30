@@ -985,9 +985,70 @@ function GreenZoneSelector({value,onChange,multi=false,maxSel=4,lightMode=false,
     </div>
   );
 }
+// ─── BagSelector ─────────────────────────────────────────────────
+function BagSelector({value,onChange,username,lightMode,label="Palo elegido"}){
+  const L=lightMode;
+  const [open,setOpen]=useState(false);
+  const bolsa=lsGet("bolsa:"+(username||""))||[];
+
+  // Palos de la bolsa del jugador, agrupados por categoría
+  const cats=BAG_CATS.map(c=>({...c,tiene:c.opts.filter(p=>bolsa.includes(p))})).filter(c=>c.tiene.length>0);
+
+  return(
+    <div style={{marginBottom:"10px"}}>
+      <label style={{fontSize:"11px",color:L?"#7a5010":"#b09050",letterSpacing:"1px",textTransform:"uppercase",display:"block",marginBottom:"4px"}}>{label}</label>
+      <button onClick={()=>setOpen(true)} style={{
+        background:value?(L?`linear-gradient(135deg,#d4a830,#b08520)`:`linear-gradient(135deg,${gold},#a8822a)`):(L?"#f5f0e8":"#2a2318"),
+        border:`2px solid ${value?gold:L?"#c8a84c":"#5a4a20"}`,
+        borderRadius:"6px",color:value?(L?"#1a1612":"#1a1612"):(L?"#5a3010":"#b09050"),
+        padding:"10px 14px",fontSize:"15px",fontWeight:value?"bold":"normal",
+        cursor:"pointer",width:"100%",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"
+      }}>
+        <span>{value||"Seleccionar palo..."}</span>
+        {value&&<span onClick={e=>{e.stopPropagation();onChange(null);}} style={{fontSize:"16px",color:L?"#7a3010":"#b09050",padding:"0 4px"}}>✕</span>}
+        {!value&&<span style={{fontSize:"14px",opacity:0.6}}>▼</span>}
+      </button>
+
+      {open&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:1000,display:"flex",alignItems:"flex-end"}} onClick={()=>setOpen(false)}>
+          <div style={{background:L?"#f5f0e8":"#1c1810",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"12px 12px 0 0",padding:"16px",width:"100%",maxHeight:"70vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"14px"}}>
+              <span style={{color:gold,fontWeight:"bold",fontSize:"14px",letterSpacing:"1px"}}>SELECCIONAR PALO</span>
+              <button onClick={()=>setOpen(false)} style={{background:"none",border:"none",color:L?"#5a3010":"#b09050",fontSize:"20px",cursor:"pointer"}}>✕</button>
+            </div>
+            {cats.length===0&&<div style={{color:L?"#7a5010":"#b09050",fontSize:"13px",textAlign:"center",padding:"20px"}}>Sin bolsa configurada — andá a Perfil → Mi Bolsa</div>}
+            {cats.map(({cat,tiene})=>(
+              <div key={cat} style={{marginBottom:"12px"}}>
+                <div style={{fontSize:"10px",color:L?"#7a5010":"#9a7840",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"6px"}}>{cat}</div>
+                <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                  {tiene.map(p=>{
+                    const sel=value===p;
+                    return(
+                      <button key={p} onClick={()=>{onChange(p);setOpen(false);}} style={{
+                        background:sel?`linear-gradient(135deg,${gold},#a8822a)`:(L?"#e8e0d0":"#2d2720"),
+                        border:`2px solid ${sel?gold:L?"#c8a84c":"#5a4a20"}`,
+                        borderRadius:"6px",color:sel?(L?"#1a1612":"#1a1612"):(L?"#5a3010":"#f5ead0"),
+                        padding:"10px 14px",fontSize:"14px",fontWeight:sel?"bold":"normal",cursor:"pointer",minWidth:"52px",textAlign:"center"
+                      }}>{p}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {value&&(
+              <button onClick={()=>{onChange(null);setOpen(false);}} style={{width:"100%",background:"#3a1a1a",border:"1px solid #7a2020",borderRadius:"6px",color:"#e88",padding:"10px",fontSize:"13px",cursor:"pointer",marginTop:"8px"}}>
+                Quitar palo seleccionado
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 // ─────────────────────────────────────────────────────────────────
 
-function HoleCard({hole,data,onChange,readonly,lightMode}){
+function HoleCard({hole,data,onChange,readonly,lightMode,username}){
   const [open,setOpen]=useState(false);
   const [recStatus,setRecStatus]=useState("idle");
   const L=lightMode||false;
@@ -1146,10 +1207,7 @@ function HoleCard({hole,data,onChange,readonly,lightMode}){
                     </div>
 
                     {/* Palo */}
-                    <div style={{marginBottom:"10px"}}>
-                      <label style={HL.lbl}>Palo elegido</label>
-                      <input style={{...HL.inp,fontSize:"15px",padding:"10px",textAlign:"center"}} type="text" placeholder="Driver, 3H, 5W..." value={t.palo||""} onChange={e=>updTiroA(i,"palo",e.target.value.toUpperCase())}/>
-                    </div>
+                    <BagSelector value={t.palo||null} onChange={v=>updTiroA(i,"palo",v||"")} username={username} lightMode={L} label="Palo elegido"/>
 
                     {/* Superficie */}
                     <div style={{marginBottom:"10px"}}>
@@ -1350,8 +1408,10 @@ function HoleCard({hole,data,onChange,readonly,lightMode}){
                 <input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="0" max="999" placeholder="—" value={t.dist||""} disabled={readonly} onChange={e=>updTiro(i,"dist",e.target.value)}/>
               </div>
               <div>
-                <label style={HL.lbl}>Palo</label>
-                <input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="text" placeholder="7H, PW..." value={t.palo||""} disabled={readonly} onChange={e=>updTiro(i,"palo",e.target.value.toUpperCase())}/>
+                {readonly
+                  ?<><label style={HL.lbl}>Palo</label><div style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center",background:"transparent",border:"none",color:gold,fontWeight:"bold"}}>{t.palo||"—"}</div></>
+                  :<BagSelector value={t.palo||null} onChange={v=>updTiro(i,"palo",v||"")} username={username} lightMode={L} label="Palo"/>
+                }
               </div>
             </div>
             <label style={HL.lbl}>Resultado</label>
@@ -1364,6 +1424,91 @@ function HoleCard({hole,data,onChange,readonly,lightMode}){
               <option value="largo">❌ Largo</option>
               <option value="lateral">❌ Lateral</option>
             </select>
+            {/* ── Detalle Ataque a Green (desplegable) ── */}
+            {!readonly&&(()=>{
+              const [openDet,setOpenDet]=useState(false);
+              const ASIENTO_FW=["Normal","Divot","Sobre los pies","Bajo los pies","Pie der más alto","Pie izq más alto"];
+              const ASIENTO_RGH_H=["Normal","¼ enterrada","½ enterrada","¾ hundida","Entera hundida","Más de una bola"];
+              const ASIENTO_RGH_P=["Pasto a favor","Pasto en contra","Pasto neutro"];
+              return(
+                <div style={{marginTop:"8px"}}>
+                  <button onClick={()=>setOpenDet(o=>!o)} style={{
+                    background:L?"#e8e0d0":"#1c1810",color:L?"#5a3010":"#b09050",
+                    border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,
+                    borderRadius:"6px",padding:"7px 12px",fontSize:"12px",cursor:"pointer",width:"100%",textAlign:"left",
+                    display:"flex",justifyContent:"space-between",alignItems:"center"
+                  }}>
+                    <span>🎯 Detalle del tiro {t.zonaElegG&&<span style={{color:gold}}>· {ZONE_LABELS[t.zonaElegG]||t.zonaElegG}</span>}</span>
+                    <span>{openDet?"▲":"▼"}</span>
+                  </button>
+                  {openDet&&(
+                    <div style={{background:L?"#ede8dc":"#0f0e0b",border:`1px solid ${L?"#c8a84c":"#3a2e10"}`,borderRadius:"0 0 6px 6px",padding:"10px",marginTop:"-1px"}}>
+                      <div style={{marginBottom:"8px"}}>
+                        <label style={HL.lbl}>Superficie</label>
+                        <div style={{display:"flex",gap:"6px"}}>
+                          {["fairway","rough"].map(s=>(
+                            <button key={s} style={{...HL.btn(t.supGreen===s?"p":"g"),flex:1,padding:"8px",fontSize:"12px"}} onClick={()=>updTiro(i,"supGreen",t.supGreen===s?"":s)}>{s==="fairway"?"Fairway":"Rough"}</button>
+                          ))}
+                        </div>
+                      </div>
+                      {t.supGreen==="fairway"&&(
+                        <div style={{marginBottom:"8px"}}>
+                          <label style={HL.lbl}>Asiento <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 3)</span></label>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                            {ASIENTO_FW.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>updTiro(i,"asientoG",(t.asientoG||[]).includes(a)?(t.asientoG||[]).filter(x=>x!==a):[...(t.asientoG||[]),a].slice(0,3))}>{a}</button>;})}
+                          </div>
+                        </div>
+                      )}
+                      {t.supGreen==="rough"&&(
+                        <div style={{marginBottom:"8px"}}>
+                          <label style={HL.lbl}>Asiento rough <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 3)</span></label>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap",marginBottom:"5px"}}>
+                            {ASIENTO_RGH_H.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>updTiro(i,"asientoG",(t.asientoG||[]).includes(a)?(t.asientoG||[]).filter(x=>x!==a):[...(t.asientoG||[]),a].slice(0,3))}>{a}</button>;})}
+                          </div>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                            {ASIENTO_RGH_P.map(a=>{const sel=(t.asientoG||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asientoG||[]).length>=3)?0.4:1}} onClick={()=>updTiro(i,"asientoG",(t.asientoG||[]).includes(a)?(t.asientoG||[]).filter(x=>x!==a):[...(t.asientoG||[]),a].slice(0,3))}>{a}</button>;})}
+                          </div>
+                        </div>
+                      )}
+                      <div style={{marginBottom:"8px"}}>
+                        <GreenZoneSelector label="Zona elegida" value={t.zonaElegG||null} onChange={v=>updTiro(i,"zonaElegG",v)} multi={false} lightMode={L} size="sm"/>
+                      </div>
+                      <div style={{marginBottom:"8px"}}>
+                        <GreenZoneSelector label="Zona de errada deseada" value={t.zonaErradaG||[]} onChange={v=>updTiro(i,"zonaErradaG",v)} multi={true} maxSel={4} lightMode={L} size="sm"/>
+                      </div>
+                      <div style={{marginBottom:"8px"}}>
+                        <label style={HL.lbl}>Zona donde terminó</label>
+                        <div style={{display:"flex",flexDirection:"column",gap:"5px"}}>
+                          {[["elegida","✓ Zona elegida"],["errada","✓ Zona de errada deseada"],["noDeseada","✗ Zona no deseada"]].map(([opt,lbl])=>(
+                            <button key={opt} style={{...HL.btn(t.zonaTermG===opt?"p":"g"),padding:"8px",fontSize:"12px",textAlign:"left",border:t.zonaTermG===opt?`2px solid ${gold}`:undefined}} onClick={()=>updTiro(i,"zonaTermG",t.zonaTermG===opt?"":opt)}>{lbl}</button>
+                          ))}
+                        </div>
+                      </div>
+                      {t.zonaTermG==="noDeseada"&&(
+                        <div style={{background:L?"#ede8dc":"#0f0d0a",border:`1px solid ${L?"#e09040":"#6a3010"}`,borderRadius:"6px",padding:"8px",marginBottom:"8px"}}>
+                          <div style={{fontSize:"10px",color:"#e09040",letterSpacing:"1px",marginBottom:"6px"}}>⚠ ZONA NO DESEADA</div>
+                          <div style={{marginBottom:"6px"}}>
+                            <GreenZoneSelector label="¿Dónde terminó?" value={t.ndDondeG||null} onChange={v=>updTiro(i,"ndDondeG",v)} multi={false} lightMode={L} size="sm"/>
+                          </div>
+                          <label style={HL.lbl}>Tipo de golpe</label>
+                          <div style={{display:"flex",gap:"6px"}}>
+                            {["Pesado","Filaso","Otro"].map(g=>(
+                              <button key={g} style={{...HL.btn(t.tipoGolpeG===g?"p":"g"),flex:1,padding:"8px",fontSize:"12px"}} onClick={()=>updTiro(i,"tipoGolpeG",t.tipoGolpeG===g?"":g)}>{g}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <label style={HL.lbl}>Nota mental (opcional)</label>
+                        <input style={{...HL.inp,fontSize:"12px"}} type="text" placeholder="Lo que pensaste..." value={t.notaG||""} onChange={e=>updTiro(i,"notaG",e.target.value)}/>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {/* ── Fin Detalle Ataque a Green ── */}
+
             {/* Aviso: corto/largo/lateral → necesita otro tiro */}
             {["corto","largo","lateral"].includes(t.resultado)&&!tirosG[i+1]&&!readonly&&(
               <div style={{marginTop:"5px",fontSize:"11px",color:L?"#b06020":"#e09040",background:L?"#fdf0e0":"#2a1a08",border:`1px solid ${L?"#e0a060":"#6a4020"}`,borderRadius:"4px",padding:"5px 8px"}}>
@@ -1759,7 +1904,7 @@ function NewRound({user,onSave,onCancel,editRound}){
           </div>
 
           {Object.keys(holes).sort((a,b)=>parseInt(a)-parseInt(b)).map(h=>(
-            <HoleCard key={h} hole={parseInt(h)} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false} lightMode={lightMode}/>
+            <HoleCard key={h} hole={parseInt(h)} data={holes[h]} onChange={d=>setHoles(p=>({...p,[h]:d}))} readonly={false} lightMode={lightMode} username={user.username}/>
           ))}
           <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderTop:`2px solid ${L?"#c8a84c":"#7a6030"}`,marginTop:"6px"}}>
             <div style={{color:L?"#7a5010":"#b09050",fontSize:"12px"}}>Putts: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalPutts||"—"}</span> · Chips: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalChips}</span> · Búnker: <span style={{color:L?"#1a1200":"#f5ead0"}}>{totalBunker}</span></div>
