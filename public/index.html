@@ -1093,6 +1093,195 @@ function HoleCard({hole,data,onChange,readonly,lightMode}){
           <textarea style={{...HL.inp,minHeight:"60px",resize:"vertical"}} value={d.note||""} onChange={e=>upd("note",e.target.value)}/>
         </div>
       )}
+      {/* ── TIROS DE SALIDA Y AVANCES ── */}
+      {!readonly&&(()=>{
+        const tiros=d.tirosAvance||[];
+        const ASIENTO_FAIRWAY=["Normal","Divot","Pelota sobre los pies","Pelota bajo los pies","Pie der más alto","Pie izq más alto"];
+        const ASIENTO_ROUGH_HUND=["Normal","¼ enterrada","½ enterrada","¾ hundida","Entera hundida","Más de una bola"];
+        const ASIENTO_ROUGH_TERR=["Sobre los pies","Bajo los pies","Pie der más alto","Pie izq más alto"];
+        const ASIENTO_ROUGH_PAST=["Pasto a favor","Pasto en contra","Pasto neutro"];
+        const ZONA_ERRADA_OPTS=["Izq","Centro","Der","Rough izq","Rough der","Cross bunker","Corta trampa","Larga trampa","Izq trampa","Der trampa"];
+        const ZONA_ND_DONDE=["Sin penalidad","Agua","OB","Perdida","Árbol injugable","Arbustos injugable","Monte injugable","Otro"];
+        const ZONA_ND_DIST=["Muy larga de deseada","Muy corta de deseada","Muy larga de errada","Muy corta de errada"];
+        const TIPO_GOLPE=["Pesado","Filaso","Otro"];
+
+        const [openTA,setOpenTA]=useState(false);
+
+        function addTiroAvance(){
+          upd("tirosAvance",[...tiros,{palo:"",superficie:"fairway",asiento:[],zonaEleg:"",zonaErrada:[],zonaTerm:"",ndDonde:"",ndDist:"",tipoGolpe:"",nota:""}]);
+        }
+        function updTiroA(i,k,v){
+          const nt=[...tiros];nt[i]={...nt[i],[k]:v};upd("tirosAvance",nt);
+        }
+        function toggleArr(arr,val,max){
+          if(arr.includes(val)) return arr.filter(x=>x!==val);
+          if(arr.length>=max) return arr;
+          return [...arr,val];
+        }
+        function removeTiroA(i){upd("tirosAvance",tiros.filter((_,idx)=>idx!==i));}
+
+        const incomplete=tiros.filter(t=>!t.palo||!t.zonaTerm).length;
+
+        return(
+          <div style={{marginBottom:"14px"}}>
+            <button onClick={()=>setOpenTA(o=>!o)} style={{
+              background:L?"#e8e0d0":"#2d2720",color:L?"#5a3010":"#f5ead0",
+              border:`1px solid ${incomplete>0?"#c07030":L?"#c8a84c":"#7a6030"}`,
+              borderRadius:"6px",padding:"10px 14px",fontSize:"13px",cursor:"pointer",
+              fontWeight:"bold",width:"100%",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center"
+            }}>
+              <span>🏌️ Tiros de Salida y Avances {tiros.length>0&&`(${tiros.length})`}</span>
+              <span style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                {incomplete>0&&<span style={{fontSize:"11px",color:"#e09040"}}>⚠ {incomplete} incompleto{incomplete>1?"s":""}</span>}
+                <span>{openTA?"▲":"▼"}</span>
+              </span>
+            </button>
+            {openTA&&(
+              <div style={{background:L?"#ede8dc":"#141210",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"0 0 6px 6px",padding:"12px",marginTop:"-1px"}}>
+                {tiros.map((t,i)=>(
+                  <div key={i} style={{background:L?"#f5f0e8":"#1c1810",border:`1px solid ${L?"#c8a84c":"#5a4a20"}`,borderRadius:"6px",padding:"12px",marginBottom:"10px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
+                      <span style={{color:gold,fontWeight:"bold",fontSize:"13px"}}>Tiro {i+1}</span>
+                      <button style={{...HL.btn("d"),padding:"4px 10px",fontSize:"11px"}} onClick={()=>removeTiroA(i)}>✕</button>
+                    </div>
+
+                    {/* Palo */}
+                    <div style={{marginBottom:"10px"}}>
+                      <label style={HL.lbl}>Palo elegido</label>
+                      <input style={{...HL.inp,fontSize:"15px",padding:"10px",textAlign:"center"}} type="text" placeholder="Driver, 3H, 5W..." value={t.palo||""} onChange={e=>updTiroA(i,"palo",e.target.value.toUpperCase())}/>
+                    </div>
+
+                    {/* Superficie */}
+                    <div style={{marginBottom:"10px"}}>
+                      <label style={HL.lbl}>Superficie</label>
+                      <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                        {["fairway","rough"].map(s=>(
+                          <button key={s} style={{...HL.btn(t.superficie===s?"p":"g"),padding:"8px 14px",fontSize:"13px",flex:1}} onClick={()=>updTiroA(i,"superficie",s)}>{s==="fairway"?"Fairway":"Rough"}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Asiento fairway */}
+                    {t.superficie==="fairway"&&(
+                      <div style={{marginBottom:"10px"}}>
+                        <label style={HL.lbl}>Asiento de pelota <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 4)</span></label>
+                        <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+                          {ASIENTO_FAIRWAY.map(a=>{
+                            const sel=(t.asiento||[]).includes(a);
+                            return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"7px 10px",fontSize:"12px",opacity:(!sel&&(t.asiento||[]).length>=4)?0.4:1}} onClick={()=>updTiroA(i,"asiento",toggleArr(t.asiento||[],a,4))}>{a}</button>;
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Asiento rough */}
+                    {t.superficie==="rough"&&(
+                      <div style={{marginBottom:"10px"}}>
+                        <label style={HL.lbl}>Asiento de pelota <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 4)</span></label>
+                        <div style={{marginBottom:"6px"}}>
+                          <div style={{fontSize:"10px",color:L?"#7a5010":"#b09050",marginBottom:"4px",letterSpacing:"1px",textTransform:"uppercase"}}>Hundimiento</div>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                            {ASIENTO_ROUGH_HUND.map(a=>{const sel=(t.asiento||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asiento||[]).length>=4)?0.4:1}} onClick={()=>updTiroA(i,"asiento",toggleArr(t.asiento||[],a,4))}>{a}</button>;})}
+                          </div>
+                        </div>
+                        <div style={{marginBottom:"6px"}}>
+                          <div style={{fontSize:"10px",color:L?"#7a5010":"#b09050",marginBottom:"4px",letterSpacing:"1px",textTransform:"uppercase"}}>Terreno</div>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                            {ASIENTO_ROUGH_TERR.map(a=>{const sel=(t.asiento||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asiento||[]).length>=4)?0.4:1}} onClick={()=>updTiroA(i,"asiento",toggleArr(t.asiento||[],a,4))}>{a}</button>;})}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{fontSize:"10px",color:L?"#7a5010":"#b09050",marginBottom:"4px",letterSpacing:"1px",textTransform:"uppercase"}}>Pasto</div>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                            {ASIENTO_ROUGH_PAST.map(a=>{const sel=(t.asiento||[]).includes(a);return <button key={a} style={{...HL.btn(sel?"p":"g"),padding:"6px 8px",fontSize:"11px",opacity:(!sel&&(t.asiento||[]).length>=4)?0.4:1}} onClick={()=>updTiroA(i,"asiento",toggleArr(t.asiento||[],a,4))}>{a}</button>;})}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Zona elegida */}
+                    <div style={{marginBottom:"10px"}}>
+                      <label style={HL.lbl}>Zona elegida</label>
+                      <div style={{display:"flex",gap:"6px"}}>
+                        {["Izq","Centro","Der"].map(z=>(
+                          <button key={z} style={{...HL.btn(t.zonaEleg===z?"p":"g"),flex:1,padding:"10px",fontSize:"13px"}} onClick={()=>updTiroA(i,"zonaEleg",t.zonaEleg===z?"":z)}>{z}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Zona de errada deseada */}
+                    <div style={{marginBottom:"10px"}}>
+                      <label style={HL.lbl}>Zona de errada deseada <span style={{color:L?"#a07030":"#9a7840",fontWeight:"normal"}}>(hasta 4)</span></label>
+                      <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                        {ZONA_ERRADA_OPTS.map(z=>{
+                          const sel=(t.zonaErrada||[]).includes(z);
+                          return <button key={z} style={{...HL.btn(sel?"p":"g"),padding:"7px 9px",fontSize:"12px",opacity:(!sel&&(t.zonaErrada||[]).length>=4)?0.4:1}} onClick={()=>updTiroA(i,"zonaErrada",toggleArr(t.zonaErrada||[],z,4))}>{z}</button>;
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Zona donde terminó */}
+                    <div style={{marginBottom:"8px"}}>
+                      <label style={HL.lbl}>Zona donde terminó</label>
+                      <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                        {["elegida","errada","noDeseada"].map(opt=>{
+                          const labels={elegida:"✓ Zona elegida",errada:"✓ Zona de errada deseada",noDeseada:"✗ Zona no deseada"};
+                          const sel=t.zonaTerm===opt;
+                          return(
+                            <button key={opt} style={{...HL.btn(sel?"p":"g"),padding:"10px",fontSize:"13px",textAlign:"left",border:sel?`2px solid ${gold}`:undefined}} onClick={()=>updTiroA(i,"zonaTerm",t.zonaTerm===opt?"":opt)}>
+                              {labels[opt]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Sub-detalle zona no deseada */}
+                    {t.zonaTerm==="noDeseada"&&(
+                      <div style={{background:L?"#ede8dc":"#0f0d0a",border:`1px solid ${L?"#e09040":"#6a3010"}`,borderRadius:"6px",padding:"10px",marginBottom:"8px"}}>
+                        <div style={{fontSize:"10px",color:"#e09040",letterSpacing:"1px",textTransform:"uppercase",marginBottom:"8px"}}>⚠ Zona no deseada — completá el detalle</div>
+                        <div style={{marginBottom:"8px"}}>
+                          <label style={HL.lbl}>¿Dónde?</label>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                            {ZONA_ND_DONDE.map(z=>(
+                              <button key={z} style={{...HL.btn(t.ndDonde===z?"p":"g"),padding:"7px 9px",fontSize:"12px"}} onClick={()=>updTiroA(i,"ndDonde",t.ndDonde===z?"":z)}>{z}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{marginBottom:"8px"}}>
+                          <label style={HL.lbl}>¿Distancia?</label>
+                          <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
+                            {ZONA_ND_DIST.map(z=>(
+                              <button key={z} style={{...HL.btn(t.ndDist===z?"p":"g"),padding:"7px 9px",fontSize:"12px"}} onClick={()=>updTiroA(i,"ndDist",t.ndDist===z?"":z)}>{z}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label style={HL.lbl}>Tipo de golpe</label>
+                          <div style={{display:"flex",gap:"6px"}}>
+                            {TIPO_GOLPE.map(g=>(
+                              <button key={g} style={{...HL.btn(t.tipoGolpe===g?"p":"g"),flex:1,padding:"9px",fontSize:"13px"}} onClick={()=>updTiroA(i,"tipoGolpe",t.tipoGolpe===g?"":g)}>{g}</button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Nota del tiro */}
+                    <div>
+                      <label style={HL.lbl}>Nota mental (opcional)</label>
+                      <input style={{...HL.inp,fontSize:"13px"}} type="text" placeholder="Lo que pensaste en este tiro..." value={t.nota||""} onChange={e=>updTiroA(i,"nota",e.target.value)}/>
+                    </div>
+                  </div>
+                ))}
+                <button style={{...HL.btn("g"),width:"100%",padding:"10px",fontSize:"13px"}} onClick={addTiroAvance}>+ Agregar tiro</button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+      {/* ── FIN TIROS DE SALIDA Y AVANCES ── */}
+
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"12px",marginBottom:"12px"}}>
         <div><label style={HL.lbl}>Par</label><input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="3" max="6" placeholder="—" value={d.par||""} disabled={readonly} onChange={e=>upd("par",e.target.value)}/></div>
         <div><label style={HL.lbl}>Dist (yds)</label><input style={{...smInp,...HL.inp,fontSize:"16px",padding:"11px",textAlign:"center"}} type="number" min="0" max="999" placeholder="—" value={d.dist||""} disabled={readonly} onChange={e=>upd("dist",e.target.value)}/></div>
